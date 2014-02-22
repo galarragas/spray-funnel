@@ -1,20 +1,12 @@
-Spray Request Throttling
+Spray Funnel
 ====================
-
-![Image](./funnel.jpg?raw=true)
 
 Spray Client extension to allow limitation of client request frequency and number of parallel requests
 
-## Dependencies:
+![Image](./funnel.jpg?raw=true)
 
-- Scala 2.10
-- Spray Client 1.2.0
-- Akka 2.2.3
-- Akka_testkit 2.2.3
-- ScalaTest 2.10
-- WireMock 1.38 - For HTTP Testing
 
-## API
+## What is it?
 
 This is a generalisation of the request throttling logic implemented in the Reactive Rest Client project on my GitHub.
 The idea is to create a generic mechanism to allow the throttling of all the messages sent and received by a `sendReceive` Spray pipeline.
@@ -50,3 +42,12 @@ class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
   def shutdown() = actorSystem.shutdown()
 }
 ```
+
+## Dependencies:
+
+- Scala 2.10
+- Spray Client 1.2.0
+- Akka 2.2.3
+- Akka_testkit 2.2.3
+- ScalaTest 2.10
+- WireMock 1.38 - For HTTP Testing
