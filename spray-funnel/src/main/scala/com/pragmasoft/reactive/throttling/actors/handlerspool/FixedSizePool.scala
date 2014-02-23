@@ -1,7 +1,5 @@
 package com.pragmasoft.reactive.throttling.actors.handlerspool
 
-import com.pragmasoft.reactive.throttling.actors.handlerspool.RequestHandlersPool
-
 trait FixedSizePool {
   self : HandlerFactory =>
 

@@ -1,7 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors.handlerspool
 
 import akka.actor.ActorRef
-import com.pragmasoft.reactive.throttling.actors.handlerspool.RequestHandlersPool
 
 class SetHandlerPool(handlers: Set[ActorRef]) extends RequestHandlersPool{
   var availableHandlers: Set[ActorRef] = handlers

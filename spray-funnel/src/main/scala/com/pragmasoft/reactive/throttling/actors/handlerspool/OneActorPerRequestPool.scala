@@ -1,7 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors.handlerspool
 
 import akka.actor.{ActorRef, ActorLogging}
-import com.pragmasoft.reactive.throttling.actors.handlerspool.RequestHandlersPool
 
 trait OneActorPerRequestPool {
   self: HandlerFactory with ActorLogging =>
