@@ -7,6 +7,7 @@ object Common {
     organization := "com.pragmasoft",
     version := "0.1",
     scalaVersion := "2.10.3"
+//    ,crossScalaVersions := Seq("2.9.2")
   )
 
   val akkaVersion = "2.2.3"

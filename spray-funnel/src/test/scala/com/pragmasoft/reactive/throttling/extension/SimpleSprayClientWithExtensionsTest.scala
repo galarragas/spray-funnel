@@ -41,7 +41,7 @@ class SimpleSprayClient(serverBaseAddress: String, timeout : Timeout ) {
 
   import SimpleClientProtocol._
 
-  implicit val actorSystem = ActorSystem("program-info-client", ConfigFactory.parseResources("test.conf"))
+  implicit val actorSystem = ActorSystem("simple-spray-client", ConfigFactory.parseResources("test.conf"))
   import actorSystem.dispatcher
 
   implicit val futureTimeout : Timeout = timeout

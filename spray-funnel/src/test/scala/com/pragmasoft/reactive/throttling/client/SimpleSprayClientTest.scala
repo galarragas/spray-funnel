@@ -35,7 +35,7 @@ class SimpleSprayClient(serverBaseAddress: String, frequency: Frequency, paralle
   import SimpleClientProtocol._
   import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling._
 
-  implicit val actorSystem = ActorSystem("program-info-client", ConfigFactory.parseResources("test.conf"))
+  implicit val actorSystem = ActorSystem("simple-spray-client", ConfigFactory.parseResources("test.conf"))
 
   import actorSystem.dispatcher
 

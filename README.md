@@ -22,7 +22,7 @@ As default uses the HTTP transport but offers the possibility of specifying a cu
 
 ## Usage
 
-There are two main types of usage of the library: creating a throtteling actor during the pipeline definition to wrap the HTTP transport or using AKKA extensions
+There are two main types of usage of the library: creating a throttling actor during the pipeline definition to wrap the HTTP transport or using AKKA extensions
 
 ### Inline Wrapping of HTTP Actor Passed to `sendReceive`
 
@@ -50,7 +50,7 @@ class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
 
 ### Using AKKA Extensions
 
-This mechanism allows the same throtteling channel to be shared by different pipelines, thus allowing to limit the
+This mechanism allows the same throttling channel to be shared by different pipelines, thus allowing to limit the
 throughput of an application talking with destinations shared by different client classes or traits.
 
 To enable this feature you need to create an AKKA extension. This is very simple and is just a matter of implementing
@@ -71,7 +71,7 @@ class SimpleSprayClient(serverBaseAddress: String, timeout : Timeout ) {
 
   import SimpleClientProtocol._
 
-  implicit val actorSystem = ActorSystem("program-info-client", ConfigFactory.parseResources("test.conf"))
+  implicit val actorSystem = ActorSystem("simple-spray-client", ConfigFactory.parseResources("test.conf"))
   import actorSystem.dispatcher
 
   implicit val futureTimeout : Timeout = timeout
@@ -102,6 +102,19 @@ qos.channels {
     }
 }
 ```
+## Adding Dependency to Spray Funnel
+
+Add conjars repository to your resolvers:
+
+```
+resolvers += "ConJars" at "http://conjars.org/repo",
+```
+
+then add the following dependencies to your sbt configuration
+
+```
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "0.1"
+```
 
 ## Dependencies:
 
@@ -111,3 +124,9 @@ qos.channels {
 - Akka_testkit 2.2.3
 - ScalaTest 2.10
 - WireMock 1.38 - For HTTP Testing
+
+## License
+
+Copyright 2014 PragmaSoft Ltd.
+
+Licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0
