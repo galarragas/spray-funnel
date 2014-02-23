@@ -7,7 +7,6 @@ Spray Client extension to allow limitation of client request frequency and numbe
 
 ![Image](./funnel.jpg?raw=true)
 
-
 ## What is it?
 
 This is a generalisation of the request throttling logic implemented in the Reactive Rest Client project on my GitHub.
