@@ -22,6 +22,10 @@ As default uses the HTTP transport but offers the possibility of specifying a cu
 
 ## Usage
 
+There are two main types of usage of the library: creating a throtteling actor during the pipeline definition to wrap the HTTP transport or using AKKA extensions
+
+### Inline Wrapping of HTTP Actor Passed to `sendReceive`
+
 A very simple way of using this library is to specify the throttling setting in the sendReceive pipeline definition like shown below
 
 ```scala
@@ -41,6 +45,61 @@ class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
 
 
   def shutdown() = actorSystem.shutdown()
+}
+```
+
+### Using AKKA Extensions
+
+This mechanism allows the same throtteling channel to be shared by different pipelines, thus allowing to limit the
+throughput of an application talking with destinations shared by different client classes or traits.
+
+To enable this feature you need to create an AKKA extension. This is very simple and is just a matter of implementing
+two classes as in the example below:
+
+```scala
+class TestFunneledChannelExtension(val system: ExtendedActorSystem) extends FunneledChannelExtension {
+  lazy val configRootName = "qos.channels.channel1"
+}
+
+object TestFunneledChannel extends ExtensionKey[TestFunneledChannelExtension]
+```
+
+Having defined the extension the Spray Client code will be written as follows:
+
+```scala
+class SimpleSprayClient(serverBaseAddress: String, timeout : Timeout ) {
+
+  import SimpleClientProtocol._
+
+  implicit val actorSystem = ActorSystem("program-info-client", ConfigFactory.parseResources("test.conf"))
+  import actorSystem.dispatcher
+
+  implicit val futureTimeout : Timeout = timeout
+
+  val pipeline = sendReceive(IO(TestFunneledChannel)) ~> unmarshal[SimpleResponse]
+
+  def callFakeService(id: Int) : Future[SimpleResponse] = pipeline { Get(s"$serverBaseAddress/fakeService?$id") }
+
+  def shutdown() = actorSystem.shutdown()
+}
+```
+
+The reference to `IO(TestFunneledChannel)` allows AKKA to retrieve the configuration of your channel and apply it to
+limit the traffic of your pipeline
+
+The AKKA configuration will be written as follows:
+
+```
+qos.channels {
+    channel1 {
+        frequency {
+            threshold = 5
+            interval = 15 s
+        }
+        # parallel.requests = 0 disables parallel request limit
+        parallel.requests = 3
+        timeout = 45 s
+    }
 }
 ```
 
