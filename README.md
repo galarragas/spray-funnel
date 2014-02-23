@@ -3,6 +3,8 @@ Spray Funnel
 
 Spray Client extension to allow limitation of client request frequency and number of parallel requests
 
+[![Build Status](https://api.travis-ci.org/galarragas/spray-funnel.png)](http://travis-ci.org/galarragas/spray-funnel)
+
 ![Image](./funnel.jpg?raw=true)
 
 
