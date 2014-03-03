@@ -118,12 +118,16 @@ libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "0.1"
 
 ## Dependencies:
 
+Runtime:
+
 - Scala 2.10
 - Spray Client 1.2.0
 - Akka 2.2.3
+
+Test:
+
 - Akka_testkit 2.2.3
-- ScalaTest 2.10
-- WireMock 1.38 - For HTTP Testing
+- Specs2 2.2.3
 
 ## License
 

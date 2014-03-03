@@ -46,6 +46,33 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
   val MAX_PARALLEL_REQUESTS = 3
   val TIMEOUT: Timeout = MAX_FREQUENCY.interval * 3
 
+
+  val testConf = ConfigFactory.parseString(
+    s"""
+    spray.can {
+      host-connector {
+        max-redirects = 5
+      }
+      server.remote-address-header = on
+    }
+
+    akka {
+      loglevel = ERROR
+      loggers = ["akka.event.slf4j.Slf4jLogger"]
+    }
+
+    qos.channels {
+        channel1 {
+            frequency {
+                threshold = ${MAX_FREQUENCY.amount}
+                interval = ${MAX_FREQUENCY.interval.inSeconds} s
+            }
+            parallel.requests = $MAX_PARALLEL_REQUESTS
+            timeout = ${TIMEOUT.duration.inSeconds} s
+        }
+    }
+    """)
+
   "A Spray Client using a throttled channel" should {
 
     s"Enqueue requests to do maximum $MAX_FREQUENCY" in new WithStubbedApi {
@@ -79,7 +106,7 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
   import com.pragmasoft.reactive.throttling.util.stubserver._
 
   class WithStubbedApi(val responseDelay: FiniteDuration = 0 seconds) extends Around with StubServerSupport {
-    override lazy val context = ActorSystem(Utils.actorSystemNameFrom(getClass), ConfigFactory.parseResources("test.conf"))
+    override lazy val context = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
     var client: SimpleClient = _
 
@@ -87,7 +114,7 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
 
       val (interface, port) = Utils.temporaryServerHostnameAndPort()
 
-      client = new SimpleClient(s"http://$interface:$port/$servicePath", TIMEOUT)(context)
+      client = new SimpleClient(s"http://$interface:$port$servicePath", TIMEOUT)(context)
       setup(interface, port, responseDelay)
       try {
         AsResult(t)

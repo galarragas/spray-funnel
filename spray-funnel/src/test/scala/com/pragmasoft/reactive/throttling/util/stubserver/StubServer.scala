@@ -12,7 +12,7 @@ import spray.client.pipelining._
 import akka.util.Timeout
 import scala.collection.mutable.ListBuffer
 
-
+import spray.http.HttpMethods._
 import spray.http.HttpRequest
 import spray.http.HttpResponse
 
@@ -35,11 +35,11 @@ class PerConnectionActor(serviceResponseDelay: FiniteDuration) extends Actor wit
 
   def receive = {
 
-    case request@HttpRequest(HttpMethods.GET, Uri(_, _, path, query, _), _, _, _) if path.toString == s"/$servicePath" ⇒
+    case request@HttpRequest(GET, Uri(_, _, Uri.Path(path), query, _), _, _, _) if path == servicePath ⇒
       requestedParams.append(query.getOrElse("id", "0").toInt)
       responseActor ! DelayedResponse(HttpResponse(OK, HttpEntity("pong")), sender, serviceResponseDelay)
 
-    case x: HttpRequest if x.uri.path.toString == s"/$countPath" ⇒
+    case request@HttpRequest(GET, Uri.Path(path), _, _, _) if path == countPath ⇒
       sender ! HttpResponse(OK, HttpEntity(requestedParams.mkString("", ",", "")))
 
     case _: Http.ConnectionClosed ⇒ context.stop(self)
@@ -84,7 +84,7 @@ trait StubServerSupport {
     val countPipeline = sendReceive ~> extractRequestList
 
     Await.result(countPipeline {
-      Get(s"http://$interface:$port/$countPath")
+      Get(s"http://$interface:$port$countPath")
     }, requestTimeout.duration)
   }
 
