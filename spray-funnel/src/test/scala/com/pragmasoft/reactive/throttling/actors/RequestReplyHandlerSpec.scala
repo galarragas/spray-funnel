@@ -2,112 +2,117 @@ package com.pragmasoft.reactive.throttling.actors
 
 import akka.testkit.{TestProbe, ImplicitSender, TestKit}
 import akka.actor.{ActorRef, Props, ActorSystem}
-import org.scalatest.{BeforeAndAfterAll, Matchers, FlatSpecLike}
 import scala.concurrent.duration._
+import org.specs2.mutable.Specification
+import org.specs2.time.NoTimeConversions
+import org.specs2.specification.Scope
+import spray.util.Utils
 
-class RequestReplyHandlerSpec extends TestKit(ActorSystem("RequestReplyHandlerSpec")) with FlatSpecLike
-    with Matchers with BeforeAndAfterAll with ImplicitSender {
+class RequestReplyHandlerSpec extends Specification with NoTimeConversions {
 
-  def createHandler[Reply](coordinator: ActorRef)(implicit manifest: Manifest[Reply]) : ActorRef =
+  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
+
+  def createHandler[Reply](coordinator: ActorRef)(implicit manifest: Manifest[Reply]): ActorRef =
     system.actorOf(Props(classOf[RequestReplyHandler[Reply]], coordinator, manifest))
 
+  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
+  
+  "RequestReplyHandler" should {
+    "forward request to transport" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
 
-  behavior of "RequestReplyHandler"
+      handler ! ClientRequest("request", testActor, transport.ref, 1 second)
 
-  it should "forward request to transport" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
+      transport.expectMsgType[String] must be equalTo "request"
+    }
 
-    handler ! ClientRequest("request", testActor, transport.ref, 1 second)
+    "forward reply to client" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
 
-    transport.expectMsg("request")
+      handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
+
+      transport.expectMsg("request")
+      transport.reply("Reply")
+
+      client.expectMsgType[String] must be equalTo "Reply"
+    }
+
+    "ignore replies of wrong type" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
+
+      val handlerDeathWatch = TestProbe()
+
+      handlerDeathWatch watch handler
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
+
+      transport.expectMsg("request")
+      transport.reply(handler, 100)
+
+      client.expectNoMsg()
+    }
+
+    "not fail for replies of wrong type" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
+
+      val handlerDeathWatch = TestProbe()
+
+      handlerDeathWatch watch handler
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
+
+      transport.expectMsg("request")
+      transport.reply(handler, 100)
+
+      client.expectNoMsg()
+      handlerDeathWatch.expectNoMsg()
+    }
+
+    "notify it is ready after receiving whatever response" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
+
+      coordinator.expectNoMsg(1 second)
+
+      transport.send(handler, "Reply")
+
+      coordinator.expectMsgType[Ready.type] should not be null
+    }
+
+    "wait the response for the timeout specified in the ClientRequest" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler[String](coordinator.ref)
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
+
+      // letting the timeout expiry
+      Thread.sleep(1100)
+
+      transport.expectMsg("request")
+      transport.reply(handler, "should be ignored")
+
+      client.expectNoMsg()
+    }
   }
 
-  it should "forward reply to client" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val client = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
-
-    handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
-
-    transport.expectMsg("request")
-    transport.reply("Reply")
-
-    client.expectMsg("Reply")
-  }
-
-  it should "ignore replies of wrong type" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val client = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
-
-    val handlerDeathWatch = TestProbe()
-
-    handlerDeathWatch watch handler
-
-    handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
-
-    transport.expectMsg("request")
-    transport.reply(handler, 100)
-
-    client.expectNoMsg()
-  }
-
-  it should "not fail for replies of wrong type" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val client = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
-
-    val handlerDeathWatch = TestProbe()
-
-    handlerDeathWatch watch handler
-
-    handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
-
-    transport.expectMsg("request")
-    transport.reply(handler, 100)
-
-    client.expectNoMsg()
-    handlerDeathWatch.expectNoMsg()
-  }
-
-  it should "notify it is ready after receiving whatever response" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val client = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
-
-    handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
-
-    coordinator.expectNoMsg( 1 second )
-
-    transport.send(handler, "Reply")
-
-    coordinator
-  }
-
-  it should "wait the response for the timeout specified in the ClientRequest" in {
-    val transport = TestProbe()
-    val coordinator = TestProbe()
-    val client = TestProbe()
-    val handler = createHandler[String](coordinator.ref)
-
-    handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
-
-    // letting the timeout expiry
-    Thread.sleep(1100)
-
-    transport.expectMsg("request")
-    transport.reply(handler, "should be ignored")
-
-    client.expectNoMsg()
-  }
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
+  step {
+    system.shutdown()
   }
 }

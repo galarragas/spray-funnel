@@ -25,8 +25,7 @@ object Common {
   )
 
   val testDependencies = Seq(
-    "org.scalatest" %% "scalatest" % "2.0" % "test",
-    "com.github.tomakehurst" % "wiremock" % "1.43" % "test",
+    "org.specs2" %%  "specs2" % "2.2.3" % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "org.mockito" % "mockito-all" % "1.9.5" % "test"
   )

@@ -1,47 +1,55 @@
 package com.pragmasoft.reactive.throttling.actors
 
-import org.scalatest.{FlatSpecLike, Matchers, FlatSpec}
+import akka.actor.ActorSystem
+import akka.testkit.{TestProbe, ImplicitSender, TestKit}
+import org.specs2.specification.Scope
+import spray.util.Utils
+import org.specs2.mutable.Specification
+import org.specs2.time.NoTimeConversions
 import com.pragmasoft.reactive.throttling.actors.handlerspool.SetHandlerPool
-import org.scalatest.mock.MockitoSugar
-import akka.actor.{ActorSystem, ActorRef}
-import akka.testkit.{TestProbe, TestKit}
 
-class SetHandlerPoolSpec extends TestKit(ActorSystem("RequestReplyHandlerSpec")) with FlatSpecLike with  Matchers {
-  
-  behavior of "SetHandlersPool"
-  
-  it should "return the content of the underlying set" in {
+class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
-    val handlers = Set( TestProbe().ref, TestProbe().ref, TestProbe().ref )
+  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
 
-    val pool = SetHandlerPool(handlers)
+  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
 
-    val retrievedHandlers = Set( pool.get(), pool.get(), pool.get() )
+  "SetHandlersPool" should {
 
-    handlers should equal(retrievedHandlers)
+    "return the content of the underlying set" in new ActorTestScope(system) {
+
+      val handlers = Set(TestProbe().ref, TestProbe().ref, TestProbe().ref)
+
+      val pool = SetHandlerPool(handlers)
+
+      val retrievedHandlers = Set(pool.get(), pool.get(), pool.get())
+
+      handlers should be equalTo retrievedHandlers
+    }
+
+    "return the content of the underlying set when building with size and factory method" in new ActorTestScope(system) {
+
+      val pool = SetHandlerPool(3) {
+        () => TestProbe().ref
+      }
+
+      val retrievedHandlers = Set(pool.get(), pool.get(), pool.get())
+
+      retrievedHandlers should have size 3
+    }
+
+
+    "not be empty when having content" in new ActorTestScope(system) {
+      SetHandlerPool(Set(TestProbe().ref)).isEmpty should beFalse
+    }
+
+    "become empty when retrieving all content" in {
+      val pool = SetHandlerPool(Set(TestProbe().ref))
+
+      pool.get()
+
+      pool.isEmpty should beTrue
+    }
   }
-
-  it should "return the content of the underlying set when building with size and factory method" in {
-
-    val pool = SetHandlerPool(3) { () => TestProbe().ref }
-
-    val retrievedHandlers = Set( pool.get(), pool.get(), pool.get() )
-
-    retrievedHandlers should have size(3)
-  }
-
-
-  it should "not be empty when having content" in {
-    SetHandlerPool(Set( TestProbe().ref )).isEmpty should be (false)
-  }
-
-  it should "become empty when retrieving all content" in {
-    val pool = SetHandlerPool(Set( TestProbe().ref ))
-
-    pool.get()
-
-    pool.isEmpty should be (true)
-  }
-
 
 }
