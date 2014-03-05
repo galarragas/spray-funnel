@@ -16,11 +16,16 @@ import spray.util.Utils
 import org.specs2.execute.{Result, AsResult}
 
 
-class TestFunneledChannelExtension(val system: ExtendedActorSystem) extends FunneledChannelExtension {
-  lazy val configRootName = "qos.channels.channel1"
+class MaxParallelRequestFunneledChannelExtension(val system: ExtendedActorSystem) extends FunneledChannelExtension {
+  lazy val configRootName = "qos.channels.max-parallel-requests-channel"
 }
 
-object TestFunneledChannel extends ExtensionKey[TestFunneledChannelExtension]
+class NoMaxParallelRequestFunneledChannelExtension(val system: ExtendedActorSystem) extends FunneledChannelExtension {
+  lazy val configRootName = "qos.channels.no-max-parallel-requests-channel"
+}
+
+object MaxParallelRequestFunneledChannel extends ExtensionKey[MaxParallelRequestFunneledChannelExtension]
+object NoMaxParallelRequestFunneledChannel extends ExtensionKey[NoMaxParallelRequestFunneledChannelExtension]
 
 class SimpleClient(serviceAddress: String, timeout: Timeout)(implicit val actorSystem: ActorSystem) {
 
@@ -28,11 +33,12 @@ class SimpleClient(serviceAddress: String, timeout: Timeout)(implicit val actorS
 
   implicit val futureTimeout: Timeout = timeout
 
-  val pipeline = sendReceive(IO(TestFunneledChannel)) ~> readResponse
+  val maxParalellRequestPipeline = sendReceive(IO(MaxParallelRequestFunneledChannel)) ~> readResponse
+  val noMaxParalellRequestPipeline = sendReceive(IO(NoMaxParallelRequestFunneledChannel)) ~> readResponse
 
-  def callFakeService(id: Int): Future[String] = pipeline {
-    Get(s"$serviceAddress?id=$id")
-  }
+  def callFakeService(id: Int): Future[String] =  noMaxParalellRequestPipeline { Get(s"$serviceAddress?id=$id") }
+
+  def callFakeServiceWithParallelRequestLimit(id: Int): Future[String] = maxParalellRequestPipeline { Get(s"$serviceAddress?id=$id")  }
 
   def shutdown() = actorSystem.shutdown()
 
@@ -62,13 +68,25 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
     }
 
     qos.channels {
-        channel1 {
+        max-parallel-requests-channel {
             frequency {
                 threshold = ${MAX_FREQUENCY.amount}
                 interval = ${MAX_FREQUENCY.interval.inSeconds} s
             }
-            parallel.requests = $MAX_PARALLEL_REQUESTS
-            timeout = ${TIMEOUT.duration.inSeconds} s
+            requests {
+              parallel-threshold = $MAX_PARALLEL_REQUESTS
+              timeout = ${TIMEOUT.duration.inSeconds} s
+            }
+        }
+        no-max-parallel-requests-channel {
+            frequency {
+                threshold = ${MAX_FREQUENCY.amount}
+                interval = ${MAX_FREQUENCY.interval.inSeconds} s
+            }
+            requests {
+              parallel-threshold = infinite
+              timeout = ${TIMEOUT.duration.inSeconds} s
+            }
         }
     }
     """)
@@ -78,7 +96,7 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
     s"Enqueue requests to do maximum $MAX_FREQUENCY" in new WithStubbedApi {
 
       val totalRequests = MAX_FREQUENCY.amount * 2
-      for {id <- 0 to totalRequests} yield client.callFakeService(id)
+      for {id <- 0 until totalRequests} yield client.callFakeService(id)
 
       Thread.sleep(1000)
 
@@ -91,7 +109,7 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
 
     s"Serve a maximun of $MAX_PARALLEL_REQUESTS requests in parallel" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
-      for {id <- 0 to totalRequests} yield client.callFakeService(id)
+      for {id <- 0 until totalRequests} yield client.callFakeServiceWithParallelRequestLimit(id)
 
       Thread.sleep(MAX_FREQUENCY.interval.toMillis)
 
@@ -100,6 +118,17 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
       Thread.sleep(1000)
 
       requestList(TIMEOUT).length shouldEqual totalRequests
+    }
+
+    "Have no concurrent request threshold for unbounded channels" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
+      val totalRequests = MAX_PARALLEL_REQUESTS + 1
+      for {id <- 0 until totalRequests} yield { client.callFakeService(id) }
+
+      Thread.sleep(1000)
+
+      val now = System.currentTimeMillis
+      val requests = requestList(TIMEOUT)
+      requests.length shouldEqual totalRequests
     }
   }
 

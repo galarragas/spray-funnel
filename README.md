@@ -96,9 +96,18 @@ qos.channels {
             threshold = 5
             interval = 15 s
         }
-        # parallel.requests = 0 disables parallel request limit
-        parallel.requests = 3
-        timeout = 45 s
+        requests {
+            # Max number of request active at the same time on this channel
+            # parallel-threshold = infinite disables parallel request limit
+            parallel-threshold = 3
+            # Max timeout waiting for the response of any request. Should be a finite value
+            timeout = 45 s
+            # Interval after which not served request will be discarded
+            expiry = infinite
+            # If set to a finite value will cause to discard all messages received when the queue of not served
+            # messages is higher than the threshold
+            max-queue-size = infinite
+        }
     }
 }
 ```

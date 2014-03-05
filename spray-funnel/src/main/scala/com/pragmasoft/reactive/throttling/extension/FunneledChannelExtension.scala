@@ -24,11 +24,13 @@ trait FunneledChannelExtension extends akka.io.IO.Extension {
 
   val frequencyThreshold = extensionConfig getInt "frequency.threshold"
   val frequencyDuration = extensionConfig getDuration  "frequency.interval"
-  val maxParallelRequests = extensionConfig getInt "parallel.requests"
-  val timeoutDuration = extensionConfig getDuration "timeout"
+  val maxParallelRequests = extensionConfig getPossiblyInfiniteInt "requests.parallel-threshold"
+  val timeoutDuration = extensionConfig getDuration "requests.timeout"
+  val maxQueueSize =  if(extensionConfig.hasPath("requests.max-queue-size")) extensionConfig getPossiblyInfiniteInt "requests.max-queue-size" else Int.MaxValue
+  val requestExpiriy = if(extensionConfig.hasPath("requests.expiry")) extensionConfig getDuration "requests.expiry" else Duration.Inf
 
   require(frequencyDuration.isFinite, "Need to specify a finite interval for 'frequency.interval'")
-  require(timeoutDuration.isFinite, "Need to specify a finite interval for 'timeout'")
+  require(timeoutDuration.isFinite, "Need to specify a finite interval for 'requests.timeout'")
 
   val frequencyInterval : FiniteDuration = frequencyDuration.toMillis millis
   implicit val timeout : Timeout = timeoutDuration.toMillis millis
@@ -38,7 +40,7 @@ trait FunneledChannelExtension extends akka.io.IO.Extension {
 
   override def manager: ActorRef =
     system.actorOf(
-      if(maxParallelRequests > 0)
+      if((maxParallelRequests >0 ) && (maxParallelRequests != Int.MaxValue))
         propsForFrequencyAndParallelRequests( frequencyThreshold every frequencyInterval,  maxParallelRequests )
       else
         propsForFrequency( frequencyThreshold every frequencyInterval ),

@@ -58,5 +58,5 @@ object HttpRequestReplyCoordinator {
 
   def propsForFrequency(frequencyThreshold: Frequency)
                        (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) =
-    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration)
+    Props(classOf[HttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration)
 }

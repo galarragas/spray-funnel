@@ -23,9 +23,14 @@ class SimpleClient(serviceAddress: String, frequency: Frequency, parallelRequest
 
   implicit val apiTimeout: Timeout = timeout
 
-  val pipeline = sendReceive(throttleFrequencyAndParallelRequests(frequency, parallelRequests)) ~> readResponse
+  val maxParallelRequestsPipeline = sendReceive(throttleFrequencyAndParallelRequests(frequency, parallelRequests)) ~> readResponse
+  val noMaxParallelRequestsPipeline = sendReceive(throttleFrequency(frequency)) ~> readResponse
 
-  def callFakeService(id: Int): Future[String] = pipeline {
+  def callFakeService(id: Int): Future[String] = noMaxParallelRequestsPipeline {
+    Get(s"$serviceAddress?id=$id")
+  }
+
+  def callFakeServiceWithMaxParallelRequests(id: Int): Future[String] = maxParallelRequestsPipeline {
     Get(s"$serviceAddress?id=$id")
   }
 
@@ -75,7 +80,7 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
 
     s"Serve a maximun of $MAX_PARALLEL_REQUESTS requests in parallel" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
-      for {id <- 0 to totalRequests} yield client.callFakeService(id)
+      for {id <- 0 to totalRequests} yield client.callFakeServiceWithMaxParallelRequests(id)
 
       Thread.sleep(MAX_FREQUENCY.interval.toMillis)
 
@@ -84,6 +89,17 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
       Thread.sleep(1000)
 
       requestList(TIMEOUT).length shouldEqual totalRequests
+    }
+
+    "Have no concurrent request threshold for unbounded channels" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
+      val totalRequests = MAX_PARALLEL_REQUESTS + 1
+      for {id <- 0 until totalRequests} yield { client.callFakeService(id) }
+
+      Thread.sleep(1000)
+
+      val now = System.currentTimeMillis
+      val requests = requestList(TIMEOUT)
+      requests.length shouldEqual totalRequests
     }
   }
 

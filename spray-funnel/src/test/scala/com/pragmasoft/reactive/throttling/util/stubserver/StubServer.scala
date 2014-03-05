@@ -83,9 +83,7 @@ trait StubServerSupport {
 
     val countPipeline = sendReceive ~> extractRequestList
 
-    Await.result(countPipeline {
-      Get(s"http://$interface:$port$countPath")
-    }, requestTimeout.duration)
+    Await.result(countPipeline { Get(s"http://$interface:$port$countPath") }, requestTimeout.duration)
   }
 
   def shutdown() {
@@ -97,7 +95,12 @@ trait StubServerSupport {
     implicit val execContext = context.dispatcher
 
     httpResponseFuture map {
-      response => response.entity.data.asString.split(",").map(_.toInt).toList
+      response =>
+        val responseData = response.entity.data.asString
+        if(responseData.isEmpty)
+          List()
+        else
+          responseData.split(",").map(_.toInt).toList
     }
   }
 }
