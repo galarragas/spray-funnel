@@ -1,6 +1,6 @@
 package com.pragmasoft.reactive.throttling.http
 
-import akka.actor.{ActorRefFactory, Props, ActorRef}
+import akka.actor.{ActorSystem, ActorRefFactory, Props, ActorRef}
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.duration.FiniteDuration
 import com.pragmasoft.reactive.throttling.actors.{RequestReplyHandler, RequestReplyThrottlingCoordinator}
@@ -13,6 +13,7 @@ import spray.can.Http
 import spray.util._
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.duration._
+import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling.HttpThrottlingConfiguration
 
 object HttpRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpRequestReplyHandler], coordinator)
@@ -65,4 +66,28 @@ object HttpRequestReplyCoordinator {
   def propsForFrequency(frequencyThreshold: Frequency)
                        (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) =
     Props(classOf[HttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, Duration.Inf, 0)
+
+  def propsForConfig(config: HttpThrottlingConfiguration)(implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : Props = {
+    if( (config.requestConfig.parallelThreshold > 0) && (config.requestConfig.parallelThreshold != Int.MaxValue) ) {
+      Props(
+        classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator],
+        io.IO(Http)(actorSystem),
+        config.frequencyThreshold,
+        config.requestConfig.timeout.duration,
+        config.requestConfig.parallelThreshold,
+        config.requestConfig.expiry,
+        config.requestConfig.maxQueueSize
+      )
+    } else {
+      Props(
+        classOf[HttpRequestReplyThrottlingCoordinator],
+        io.IO(Http)(actorSystem),
+        config.frequencyThreshold,
+        config.requestConfig.timeout.duration,
+        config.requestConfig.expiry,
+        config.requestConfig.maxQueueSize
+      )
+    }
+  }
+
 }

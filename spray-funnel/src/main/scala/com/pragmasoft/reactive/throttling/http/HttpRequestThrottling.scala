@@ -13,6 +13,39 @@ import com.pragmasoft.reactive.throttling.http.HttpRequestReplyCoordinator._
 object HttpRequestThrottling {
 
   /**
+   * Configuration related to the Request Throttling parameters
+   *
+   * @param parallelThreshold  Max number of request active at the same time on this channel.
+   *                           parallel-threshold = infinite disables parallel request limit
+   *                           Defaults to unlimited
+   *                           Values <= 0 and == Int.MaxValue means unlimited
+   * @param timeout            Max timeout waiting for the response of any request.
+   *                           Should be a finite value.
+   *                           Defaults to 60 seconds
+   * @param expiry             Interval after which not served request will be discarded
+   *                           Defaults to Duration.Inf => no expiry
+   * @param maxQueueSize       If set to a finite value will cause to discard all messages received when t
+   *                           he queue of not served messages is higher than the threshold
+   *                           Defaults to umlimited
+   *                           Values <= 0 and Int.MaxValue mean infinite size
+  */
+  case class RequestThrottlingConfiguration(
+    parallelThreshold: Int = 0,
+    timeout : Timeout = 60.seconds,
+    expiry : Duration = Duration.Inf,
+    maxQueueSize : Int = Int.MaxValue
+  )
+
+  /**
+   * @param frequencyThreshold  Frequency threshold
+   * @param requestConfig       Request level configuration @see RequestThrottlingConfiguration
+   */
+  case class HttpThrottlingConfiguration(
+    frequencyThreshold: Frequency,
+    requestConfig : RequestThrottlingConfiguration = RequestThrottlingConfiguration()
+  )
+
+  /**
    * Creates a Quality of Service Actor forwarding every HttpRequest to the HTTP AKKA extension
    * limiting the frequency and number of parallel request passing through it.
    *
@@ -51,6 +84,21 @@ object HttpRequestThrottling {
                        (implicit actorSystem : ActorSystem, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) : ActorRef =
     actorSystem.actorOf(propsForFrequency(frequencyThreshold)(actorSystem, executionContext, requestTimeout) )
 
+
+  /**
+   * Creates a Quality of Service Actor orwarding every HttpRequest to the HTTP AKKA extension
+   * limiting the frequency of the requests passing through it, the max number of parallel requests, the expiration time
+   * after which unserved requests will be discarded and the maximum number of unserved messages after which any new request will
+   * be discarded until the queue depth will become lower than the threshold.
+   *
+   * @param config            Threshold configuration
+   * @param actorSystem       The Actor System the new agent has to be created in
+   * @param executionContext  The Execution Context to be used in handling futures
+   * @return
+   */
+  def throttleWithConfig(config: HttpThrottlingConfiguration)
+                        (implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : ActorRef =
+     actorSystem.actorOf(propsForConfig(config)(actorSystem, executionContext))
 
   /**
    * Creates a Quality of Service Actor forwarding every HttpRequest to the specified transport

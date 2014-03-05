@@ -72,7 +72,7 @@ abstract class RequestReplyThrottlingCoordinator[Request](
          )
         tryToServeRequest()
       } else {
-        log.debug( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
+        log.warning( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
       }
 
   }
@@ -89,7 +89,7 @@ abstract class RequestReplyThrottlingCoordinator[Request](
       if(!currRequest.isExpired)
         Some(currRequest.request)
       else {
-        log.debug(s"Request $currRequest is expired, discarding it")
+        log.warning(s"Request $currRequest is expired, discarding it")
         nextRequest()
       }
     }
