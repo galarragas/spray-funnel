@@ -15,28 +15,49 @@ import org.specs2.time.NoTimeConversions
 import org.specs2.mutable.Specification
 import org.specs2.mock._
 import spray.util.Utils
+import com.typesafe.config.ConfigFactory
 
 
 class TestCoordinator[Request](
                                 transport: ActorRef,
                                 frequencyThreshold: Frequency,
                                 requestTimeout: FiniteDuration,
-                                val handlersPool: RequestHandlersPool
-                                )(implicit manifest: Manifest[Request]) extends RequestReplyThrottlingCoordinator[Request](transport, frequencyThreshold, requestTimeout)(manifest)
+                                val handlersPool: RequestHandlersPool,
+                                requestExpiry: Duration,
+                                maxQueueSize: Int
+                                )(implicit manifest: Manifest[Request])
+  extends RequestReplyThrottlingCoordinator[Request](transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize)(manifest)
 
 class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeConversions with Mockito {
 
   abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
 
+  val testConf = ConfigFactory.parseString(
+    s"""
+    spray.can {
+      host-connector {
+        max-redirects = 5
+      }
+      server.remote-address-header = on
+    }
 
-  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
+    akka {
+      loglevel = INFO
+      loggers = ["akka.event.slf4j.Slf4jLogger"]
+    }
+    """)
+
+
+  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
   val requestTimeout = 2 minutes
 
   val transport = TestProbe()
 
-  def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: RequestHandlersPool)(implicit manifest: Manifest[Request]): ActorRef =
-    system.actorOf(Props(classOf[TestCoordinator[Request]], transport.ref, frequencyThreshold, requestTimeout, handlersPool, manifest))
+  def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: RequestHandlersPool,
+                               requestExpiry: Duration = Duration.Inf,
+                               maxQueueSize: Int = 0)(implicit manifest: Manifest[Request]): ActorRef =
+    system.actorOf(Props(classOf[TestCoordinator[Request]], transport.ref, frequencyThreshold, requestTimeout, handlersPool, requestExpiry, maxQueueSize, manifest))
 
 
   "RequestReplyThrottlingCoordinator" should {
@@ -105,7 +126,6 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       when(alwaysHasHandlersAvailable.get()).thenReturn(testHandler.ref)
       when(alwaysHasHandlersAvailable.isEmpty).thenReturn(false)
 
-
       val coordinator = testCoordinator[HttpRequest](3 every (3 seconds), alwaysHasHandlersAvailable)
 
       coordinator ! Get("localhost:9090")
@@ -161,6 +181,44 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       there was one(pool).isEmpty
       there was one(pool).get
     }
+
+    "discard expired requests" in new ActorTestScope(system) {
+      val testHandler1 = TestProbe()
+      val coordinator = testCoordinator[HttpRequest](1 perSecond, SetHandlerPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
+
+      coordinator ! Get("localhost:9090") // This is sent
+      coordinator ! Get("localhost:9091") // this is enqueued for 1 second and then expires
+
+      testHandler1.expectMsgType[ClientRequest[HttpRequest]] must be equalTo ClientRequest(Get("localhost:9090"), testActor, transport.ref, requestTimeout)
+
+      testHandler1.expectNoMsg(1 second)
+
+      testHandler1.send(coordinator, Ready)
+
+      testHandler1.expectNoMsg(1 second)
+    }
+
+    "discard request received when queue is too full" in new ActorTestScope(system) {
+      val testHandler1 = TestProbe()
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set(testHandler1.ref)), maxQueueSize = 1)
+
+      coordinator ! Get("localhost:9090") // This is sent
+      coordinator ! Get("localhost:9091") // This is enqueued
+      coordinator ! Get("localhost:9092") // This should be discarded
+
+      testHandler1.expectMsgType[ClientRequest[HttpRequest]] must be equalTo ClientRequest(Get("localhost:9090"), testActor, transport.ref, requestTimeout)
+
+      testHandler1.expectNoMsg(1 second)
+
+      testHandler1.send(coordinator, Ready)
+
+      testHandler1.expectMsgType[ClientRequest[HttpRequest]] must be equalTo ClientRequest(Get("localhost:9091"), testActor, transport.ref, requestTimeout)
+
+      testHandler1.send(coordinator, Ready)
+
+      testHandler1.expectNoMsg(1 second)
+    }
+
   }
 
   step {

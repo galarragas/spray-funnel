@@ -5,7 +5,7 @@ object Common {
 
   val settings: Seq[Setting[_]] = Seq (
     organization := "com.pragmasoft",
-    version := "0.1",
+    version := "0.2",
     scalaVersion := "2.10.3"
 //    ,crossScalaVersions := Seq("2.9.2")
   )

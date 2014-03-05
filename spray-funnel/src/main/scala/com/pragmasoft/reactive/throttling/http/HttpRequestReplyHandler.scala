@@ -24,8 +24,10 @@ class HttpRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler
 abstract class AbstractHttpRequestReplyThrottlingCoordinator(
                                                               transport: ActorRef,
                                                               frequencyThreshold: Frequency,
-                                                              requestTimeout: FiniteDuration
-                                                              ) extends RequestReplyThrottlingCoordinator[HttpRequest](transport, frequencyThreshold, requestTimeout) with HandlerFactory {
+                                                              requestTimeout: FiniteDuration,
+                                                              requestExpiry: Duration,
+                                                              maxQueueSize: Int
+                                                              ) extends RequestReplyThrottlingCoordinator[HttpRequest](transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize) with HandlerFactory {
 
   def createHandler() = context.actorOf(HttpRequestReplyHandler.props(self))
 }
@@ -34,15 +36,19 @@ class FixedPoolSizeHttpRequestReplyThrottlingCoordinator(
                                                           transport: ActorRef,
                                                           frequencyThreshold: Frequency,
                                                           requestTimeout: FiniteDuration,
-                                                          val poolSize: Int
-                                                          ) extends AbstractHttpRequestReplyThrottlingCoordinator(transport, frequencyThreshold, requestTimeout) with FixedSizePool
+                                                          val poolSize: Int,
+                                                          requestExpiry: Duration,
+                                                          maxQueueSize: Int
+                                                          ) extends AbstractHttpRequestReplyThrottlingCoordinator(transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize) with FixedSizePool
 
 
 class HttpRequestReplyThrottlingCoordinator(
                                              transport: ActorRef,
                                              frequencyThreshold: Frequency,
-                                             requestTimeout: FiniteDuration
-                                             ) extends AbstractHttpRequestReplyThrottlingCoordinator(transport, frequencyThreshold, requestTimeout) with OneActorPerRequestPool
+                                             requestTimeout: FiniteDuration,
+                                             requestExpiry: Duration,
+                                             maxQueueSize: Int
+                                             ) extends AbstractHttpRequestReplyThrottlingCoordinator(transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize) with OneActorPerRequestPool
 
 
 object HttpRequestReplyCoordinator {
@@ -54,9 +60,9 @@ object HttpRequestReplyCoordinator {
 
   def propsForFrequencyAndParallelRequests(frequencyThreshold: Frequency, maxParallelRequests: Int)
                                           (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext,requestTimeout: Timeout = 60.seconds) =
-    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, maxParallelRequests)
+    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, maxParallelRequests, Duration.Inf, 0)
 
   def propsForFrequency(frequencyThreshold: Frequency)
                        (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) =
-    Props(classOf[HttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration)
+    Props(classOf[HttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, Duration.Inf, 0)
 }

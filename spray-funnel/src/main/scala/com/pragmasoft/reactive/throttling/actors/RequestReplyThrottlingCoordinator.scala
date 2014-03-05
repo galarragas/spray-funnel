@@ -14,21 +14,33 @@ case class ClientRequest[Request](request: Request, client: ActorRef, transport:
 
 // Features to add:
 // - Retry a request after some time (how? what time) this on top of Spray retry
+// - Limit per SOURCE IP (to support client clustering)
+
 // - Max time of execution. Drop request not served after the specified time
 // - Max queue size, refuse messages after the queue size arrived at the limit
-// - Limit per SOURCE IP (to support client clustering)
 
 abstract class RequestReplyThrottlingCoordinator[Request](
         transport: ActorRef,
         frequencyThreshold: Frequency,
-        requestTimeout: FiniteDuration
+        requestTimeout: FiniteDuration,
+        requestExpiry: Duration,
+        maxQueueSize: Int
      )(implicit manifest: Manifest[Request]) extends Actor with ActorLogging {
+
+  case class ExpiryingClientRequest(request: ClientRequest[Request], expiry: Long) {
+    def isExpired : Boolean = {
+       if(expiry > 0)
+         System.currentTimeMillis > expiry
+       else
+         false
+    }
+  }
 
   import context.dispatcher
 
   def handlersPool : RequestHandlersPool
 
-  class RequestQueue extends AbstractNodeQueue[ClientRequest[Request]]
+  class RequestQueue extends AbstractNodeQueue[ExpiryingClientRequest]
 
   val requestsToServe = new RequestQueue
 
@@ -44,30 +56,62 @@ abstract class RequestReplyThrottlingCoordinator[Request](
   override def receive: Actor.Receive = {
     case Ready =>
       handlersPool putBack sender
-      tryToServeRequest
+      tryToServeRequest()
 
     case IntervalExpired =>
       leftRequestAllowanceForThisInterval = frequencyThreshold.amount
-      tryToServeRequest
+      tryToServeRequest()
 
     case request if(manifest.runtimeClass.isAssignableFrom(request.getClass) ) =>
-      requestsToServe.add( ClientRequest(request.asInstanceOf[Request], sender, transport, requestTimeout) )
-      tryToServeRequest
+      if( (maxQueueSize <= 0) || (requestsToServe.count() < maxQueueSize) ) {
+        requestsToServe.add(
+           ExpiryingClientRequest(
+             ClientRequest(request.asInstanceOf[Request], sender, transport, requestTimeout),
+             getMessageExpiry
+           )
+         )
+        tryToServeRequest()
+      } else {
+        log.debug( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
+      }
 
   }
 
-  def tryToServeRequest : Unit = {
-    if( (leftRequestAllowanceForThisInterval > 0) && !requestsToServe.isEmpty) {
-      if( !handlersPool.isEmpty ) {
-        handlersPool.get() ! requestsToServe.poll()
-        leftRequestAllowanceForThisInterval -= 1
-      } else {
-        log.debug(s"No handlers available to serve request having ${requestsToServe.count()} to be sent and $leftRequestAllowanceForThisInterval messages still allowed to be sent in this interval")
+  def getMessageExpiry : Long = {
+    if(requestExpiry == Duration.Inf) 0 else System.currentTimeMillis + requestExpiry.toMillis
+  }
+
+  def nextRequest() : Option[ClientRequest[Request]] = {
+    if(requestsToServe.isEmpty) {
+      None
+    } else {
+      val currRequest = requestsToServe.poll()
+      if(!currRequest.isExpired)
+        Some(currRequest.request)
+      else {
+        log.debug(s"Request $currRequest is expired, discarding it")
+        nextRequest()
+      }
+    }
+  }
+
+  def tryToServeRequest() : Unit = {
+    if( (leftRequestAllowanceForThisInterval > 0) && !handlersPool.isEmpty ) {
+      nextRequest() match {
+        case Some(request) =>
+          handlersPool.get() ! request
+          leftRequestAllowanceForThisInterval -= 1
+        case None =>
+          log.debug(s"No messages left to be sent and $leftRequestAllowanceForThisInterval messages still allowed to be sent in this interval")
       }
     } else {
-      log.debug("Not sending message: leftRequestAllowanceForThisMinute: {}, #requestToServe: {}", leftRequestAllowanceForThisInterval, requestsToServe.count())
+      if(handlersPool.isEmpty)
+        log.debug(s"No handlers available to serve request having ${requestsToServe.count()} to be sent and $leftRequestAllowanceForThisInterval messages still allowed to be sent in this interval")
+      else
+        log.debug("Not sending message: leftRequestAllowanceForThisMinute: {}, #requestToServe: {}", leftRequestAllowanceForThisInterval, requestsToServe.count())
     }
-
   }
+
+
 
 }
