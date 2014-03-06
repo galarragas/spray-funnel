@@ -138,6 +138,21 @@ object HttpRequestThrottling {
                                                      (implicit actorSystem : ActorSystem, requestTimeout: Timeout = 60.seconds) : ActorRef =
     actorSystem.actorOf(propsForFrequencyWithTransport(frequencyThreshold, transport, requestTimeout))
 
+
+  /**
+   * Creates a Quality of Service Actor orwarding every HttpRequest to the to the specified transport
+   * limiting the frequency of the requests passing through it, the max number of parallel requests, the expiration time
+   * after which unserved requests will be discarded and the maximum number of unserved messages after which any new request will
+   * be discarded until the queue depth will become lower than the threshold.
+   *
+   * @param config            Threshold configuration
+   * @param actorSystem       The Actor System the new agent has to be created in
+   * @param executionContext  The Execution Context to be used in handling futures
+   * @return
+   */
+  def throttleWithConfigAndTransport(config: HttpThrottlingConfiguration, transport: ActorRef)
+                        (implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : ActorRef =
+    actorSystem.actorOf(propsForConfig(config)(actorSystem, executionContext))
 }
 
 

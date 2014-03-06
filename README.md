@@ -17,6 +17,8 @@ It allows to limit the output throughput of a Spray client in terms of:
 
 - Number of request per specified interval
 - Number of parallel request
+- Timeout after which an enqueued request has to be discarded
+- Maximum number of messages enqueued after which new incoming messages are discarded until the queue size decreases (limiting spikes)
 
 As default uses the HTTP transport but offers the possibility of specifying a custom transport
 
@@ -47,6 +49,16 @@ class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
   def shutdown() = actorSystem.shutdown()
 }
 ```
+
+The object `HttpRequestThrottling` exports the following methods:
+
+- `throttleFrequency` to throttle the http traffic frequency only
+- `throttleFrequencyAndParallelRequests` to throttle the http traffic frequency only
+- `throttleWithConfig` to specify more complex configuration (see section below about extensions to see a decription of the configuration options)
+
+It is also possible to specify a transport different than HTTP with the methods `throttleFrequencyWithTransport`,
+`throttleFrequencyAndParallelRequestWithTransport`, `throttleWithConfigAndTransport`
+
 
 ### Using AKKA Extensions
 
@@ -122,7 +134,7 @@ resolvers += "ConJars" at "http://conjars.org/repo",
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "0.1"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "0.2"
 ```
 
 ## Dependencies:

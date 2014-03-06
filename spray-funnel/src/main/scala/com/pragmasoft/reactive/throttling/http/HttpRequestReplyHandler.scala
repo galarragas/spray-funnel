@@ -14,6 +14,10 @@ import spray.util._
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.duration._
 import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling.HttpThrottlingConfiguration
+import spray.http.HttpRequest
+import spray.http.HttpResponse
+import com.pragmasoft.reactive.throttling.threshold.Frequency
+import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling.HttpThrottlingConfiguration
 
 object HttpRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpRequestReplyHandler], coordinator)
@@ -54,24 +58,16 @@ class HttpRequestReplyThrottlingCoordinator(
 
 object HttpRequestReplyCoordinator {
   def propsForFrequencyAndParallelRequestsWithTransport(frequencyThreshold: Frequency, maxParallelRequests: Int, transport: ActorRef, requestTimeout: Timeout) =
-    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], transport, frequencyThreshold, requestTimeout.duration, maxParallelRequests)
+    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], transport, frequencyThreshold, requestTimeout.duration, maxParallelRequests, Duration.Inf, 0)
 
   def propsForFrequencyWithTransport(frequencyThreshold: Frequency, transport: ActorRef, requestTimeout: Timeout) =
-    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], transport, frequencyThreshold, requestTimeout.duration)
+    Props(classOf[HttpRequestReplyThrottlingCoordinator], transport, frequencyThreshold, requestTimeout.duration, Duration.Inf, 0)
 
-  def propsForFrequencyAndParallelRequests(frequencyThreshold: Frequency, maxParallelRequests: Int)
-                                          (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext,requestTimeout: Timeout = 60.seconds) =
-    Props(classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, maxParallelRequests, Duration.Inf, 0)
-
-  def propsForFrequency(frequencyThreshold: Frequency)
-                       (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) =
-    Props(classOf[HttpRequestReplyThrottlingCoordinator], io.IO(Http)(actorSystem), frequencyThreshold, requestTimeout.duration, Duration.Inf, 0)
-
-  def propsForConfig(config: HttpThrottlingConfiguration)(implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : Props = {
+  def propsForConfigAndTransport(config: HttpThrottlingConfiguration, transport: ActorRef) : Props = {
     if( (config.requestConfig.parallelThreshold > 0) && (config.requestConfig.parallelThreshold != Int.MaxValue) ) {
       Props(
         classOf[FixedPoolSizeHttpRequestReplyThrottlingCoordinator],
-        io.IO(Http)(actorSystem),
+        transport,
         config.frequencyThreshold,
         config.requestConfig.timeout.duration,
         config.requestConfig.parallelThreshold,
@@ -81,7 +77,7 @@ object HttpRequestReplyCoordinator {
     } else {
       Props(
         classOf[HttpRequestReplyThrottlingCoordinator],
-        io.IO(Http)(actorSystem),
+        transport,
         config.frequencyThreshold,
         config.requestConfig.timeout.duration,
         config.requestConfig.expiry,
@@ -89,5 +85,16 @@ object HttpRequestReplyCoordinator {
       )
     }
   }
+
+  def propsForFrequencyAndParallelRequests(frequencyThreshold: Frequency, maxParallelRequests: Int)
+                                          (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext,requestTimeout: Timeout = 60.seconds) =
+    propsForFrequencyAndParallelRequestsWithTransport(frequencyThreshold , maxParallelRequests, io.IO(Http)(actorSystem), requestTimeout)
+
+  def propsForFrequency(frequencyThreshold: Frequency)
+                       (implicit refFactory: ActorRefFactory, executionContext: ExecutionContext, requestTimeout: Timeout = 60.seconds) =
+    propsForFrequencyWithTransport(frequencyThreshold, io.IO(Http)(actorSystem), requestTimeout)
+
+  def propsForConfig(config: HttpThrottlingConfiguration)(implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : Props =
+    propsForConfigAndTransport(config, io.IO(Http)(actorSystem))
 
 }
