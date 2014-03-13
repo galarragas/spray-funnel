@@ -1,4 +1,4 @@
-package com.pragmasoft.reactive.throttling.client
+package com.pragmasoft.reactive.throttling.http.client
 
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
@@ -17,7 +17,7 @@ import com.pragmasoft.reactive.throttling.threshold.Frequency
 
 class SimpleClient(serviceAddress: String, frequency: Frequency, parallelRequests: Int, timeout: Timeout)(implicit val actorSystem: ActorSystem) {
 
-  import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling._
+  import com.pragmasoft.reactive.throttling.http.client.HttpClientThrottling._
 
   import actorSystem.dispatcher
 
@@ -116,7 +116,7 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
       val (interface, port) = Utils.temporaryServerHostnameAndPort()
 
       client = new SimpleClient(s"http://$interface:$port$servicePath", MAX_FREQUENCY, MAX_PARALLEL_REQUESTS, TIMEOUT)(context)
-      setup(interface, port, responseDelay)
+      setupForClientTesting(interface, port, responseDelay)
       try {
         AsResult(t)
       } finally {

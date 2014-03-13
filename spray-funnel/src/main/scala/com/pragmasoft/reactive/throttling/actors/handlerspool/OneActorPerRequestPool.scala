@@ -1,6 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors.handlerspool
 
-import akka.actor.{ActorRef, ActorLogging}
+import akka.actor.{ActorRefFactory, ActorSystem, ActorRef, ActorLogging}
 
 trait OneActorPerRequestPool {
   self: HandlerFactory with ActorLogging =>
@@ -12,6 +12,8 @@ trait OneActorPerRequestPool {
       log.debug("Actor {} completed its job, stopping it", handler.path)
       context stop handler
     }
+
+    def shutdown()(implicit context: ActorRefFactory) : Unit = ()
 
     override def get(): ActorRef = createHandler()
   }

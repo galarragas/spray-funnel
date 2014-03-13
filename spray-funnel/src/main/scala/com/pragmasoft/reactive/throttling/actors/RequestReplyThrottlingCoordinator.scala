@@ -1,11 +1,12 @@
 package com.pragmasoft.reactive.throttling.actors
 
-import akka.actor.{OneForOneStrategy, ActorLogging, Actor, ActorRef}
-import scala.concurrent.duration.FiniteDuration
+import akka.actor._
 import akka.dispatch.AbstractNodeQueue
 import akka.actor.SupervisorStrategy.Resume
 import scala.concurrent.duration._
 import com.pragmasoft.reactive.throttling.actors.handlerspool.RequestHandlersPool
+import scala.Some
+import akka.actor.OneForOneStrategy
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 
 object IntervalExpired
@@ -16,18 +17,15 @@ case class ClientRequest[Request](request: Request, client: ActorRef, transport:
 // - Retry a request after some time (how? what time) this on top of Spray retry
 // - Limit per SOURCE IP (to support client clustering)
 
-// - Max time of execution. Drop request not served after the specified time
-// - Max queue size, refuse messages after the queue size arrived at the limit
-
 abstract class RequestReplyThrottlingCoordinator[Request](
-        transport: ActorRef,
+        targetRequestHandler: ActorRef,
         frequencyThreshold: Frequency,
         requestTimeout: FiniteDuration,
         requestExpiry: Duration,
         maxQueueSize: Int
      )(implicit manifest: Manifest[Request]) extends Actor with ActorLogging {
 
-  case class ExpiryingClientRequest(request: ClientRequest[Request], expiry: Long) {
+  case class ExpiryingClientRequest(clientRequest: ClientRequest[Request], expiry: Long) {
     def isExpired : Boolean = {
        if(expiry > 0)
          System.currentTimeMillis > expiry
@@ -49,6 +47,8 @@ abstract class RequestReplyThrottlingCoordinator[Request](
       case _: Exception                => Resume
     }
 
+  context.watch(targetRequestHandler)
+
   var leftRequestAllowanceForThisInterval = frequencyThreshold.amount
 
   context.system.scheduler.schedule(frequencyThreshold.interval, frequencyThreshold.interval, self, IntervalExpired)
@@ -63,19 +63,25 @@ abstract class RequestReplyThrottlingCoordinator[Request](
       tryToServeRequest()
 
     case request if(manifest.runtimeClass.isAssignableFrom(request.getClass) ) =>
-      if( (maxQueueSize <= 0) || (requestsToServe.count() < maxQueueSize) ) {
+      if( isUnboundQueue || (requestsToServe.count() < maxQueueSize) ) {
         requestsToServe.add(
            ExpiryingClientRequest(
-             ClientRequest(request.asInstanceOf[Request], sender, transport, requestTimeout),
+             ClientRequest(request.asInstanceOf[Request], sender, targetRequestHandler, requestTimeout),
              getMessageExpiry
            )
          )
         tryToServeRequest()
       } else {
-        log.warning( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
+        log.debug( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
+        requestRefused(request.asInstanceOf[Request])
       }
 
+    case Terminated(`targetRequestHandler`) =>
+        log.debug("Transport terminated. Shutting down")
+        context.stop(self)
   }
+
+  def isUnboundQueue : Boolean =  (maxQueueSize <= 0) || (maxQueueSize == Int.MaxValue)
 
   def getMessageExpiry : Long = {
     if(requestExpiry == Duration.Inf) 0 else System.currentTimeMillis + requestExpiry.toMillis
@@ -87,13 +93,18 @@ abstract class RequestReplyThrottlingCoordinator[Request](
     } else {
       val currRequest = requestsToServe.poll()
       if(!currRequest.isExpired)
-        Some(currRequest.request)
+        Some(currRequest.clientRequest)
       else {
-        log.warning(s"Request $currRequest is expired, discarding it")
+        log.debug(s"Request $currRequest is expired, discarding it")
+        requestExpired(currRequest.clientRequest)
         nextRequest()
       }
     }
   }
+
+  def requestExpired(clientRequest: ClientRequest[Request]) : Unit
+
+  def requestRefused(request: Request) : Unit
 
   def tryToServeRequest() : Unit = {
     if( (leftRequestAllowanceForThisInterval > 0) && !handlersPool.isEmpty ) {
@@ -112,6 +123,8 @@ abstract class RequestReplyThrottlingCoordinator[Request](
     }
   }
 
-
+  override def postStop(): Unit = {
+    handlersPool.shutdown()
+  }
 
 }

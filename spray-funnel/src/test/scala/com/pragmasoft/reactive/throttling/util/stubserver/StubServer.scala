@@ -28,7 +28,7 @@ class DelayedResponseActor extends Actor {
   }
 }
 
-class PerConnectionActor(serviceResponseDelay: FiniteDuration) extends Actor with ActorLogging {
+class ConfigurableDelayHttpServerActor(serviceResponseDelay: FiniteDuration) extends Actor with ActorLogging {
   val responseActor = context.actorOf(Props(classOf[DelayedResponseActor]))
 
   val requestedParams = ListBuffer[Int]()
@@ -46,13 +46,11 @@ class PerConnectionActor(serviceResponseDelay: FiniteDuration) extends Actor wit
   }
 }
 
-class StubServer(interface: String, port: Int, serviceResponseDelay: FiniteDuration) extends Actor with ActorLogging {
-  val allConnections = context.actorOf(Props(new PerConnectionActor(serviceResponseDelay)))
-
+class StubServer(serviceResponseDelay: FiniteDuration, allConnectionsHandler: ActorRef) extends Actor with ActorLogging {
   override def receive: Actor.Receive = {
     case Http.Connected(peer, _) ⇒
       log.debug("Connected with {}", peer)
-      sender ! Http.Register(allConnections)
+      sender ! Http.Register(allConnectionsHandler)
   }
 }
 
@@ -65,13 +63,30 @@ trait StubServerSupport {
   var interface: String = _
   var port: Int = _
 
-  def setup(interface: String, port: Int, responseDelay: FiniteDuration): Unit = {
+  var allConnectionsHandler : ActorRef = _
+
+  def setupForClientTesting(interface: String, port: Int, responseDelay: FiniteDuration): Unit = {
     this.interface = interface
     this.port = port
 
     implicit val _ = context
 
-    service = context.actorOf(Props(classOf[StubServer], interface, port, responseDelay))
+    allConnectionsHandler = context.actorOf(Props(new ConfigurableDelayHttpServerActor(responseDelay)))
+    
+    service = context.actorOf(Props(classOf[StubServer], responseDelay, allConnectionsHandler))
+    Await.ready(IO(Http).ask(Http.Bind(service, interface, port))(3.seconds), 3.seconds)
+  }
+  
+  def setupForServerTesting(interface: String, port: Int, responseDelay: FiniteDuration, throttlingWrapperPropsFactory: ActorRef => ActorRef ): Unit = {
+    this.interface = interface
+    this.port = port
+
+    implicit val _ = context
+
+    // The connection handler will be wrapped by the throttling actor
+    allConnectionsHandler = throttlingWrapperPropsFactory( context.actorOf(Props(new ConfigurableDelayHttpServerActor(responseDelay))) )
+
+    service = context.actorOf(Props(classOf[StubServer], interface, port, responseDelay, allConnectionsHandler))
     Await.ready(IO(Http).ask(Http.Bind(service, interface, port))(3.seconds), 3.seconds)
   }
 
@@ -81,7 +96,8 @@ trait StubServerSupport {
     implicit val execContext = context.dispatcher
     implicit val actorContext = context
 
-    val countPipeline = sendReceive ~> extractRequestList
+    // Sending requests directly to the all connections handler actor, this will avoid any throttling IF configured
+    val countPipeline = sendReceive(allConnectionsHandler) ~> extractRequestList
 
     Await.result(countPipeline { Get(s"http://$interface:$port$countPath") }, requestTimeout.duration)
   }
@@ -89,6 +105,7 @@ trait StubServerSupport {
   def shutdown() {
     IO(Http)(context).tell(Http.Unbind, service)
     context.stop(service)
+    context.stop(allConnectionsHandler)
   }
 
   def extractRequestList(httpResponseFuture: Future[HttpResponse]): Future[List[Int]] = {

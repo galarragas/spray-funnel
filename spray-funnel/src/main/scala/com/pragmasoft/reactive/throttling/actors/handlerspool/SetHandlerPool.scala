@@ -1,6 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors.handlerspool
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRefFactory, ActorSystem, ActorRef}
 
 class SetHandlerPool(handlers: Set[ActorRef]) extends RequestHandlersPool{
   var availableHandlers: Set[ActorRef] = handlers
@@ -12,6 +12,10 @@ class SetHandlerPool(handlers: Set[ActorRef]) extends RequestHandlersPool{
     availableHandlers = availableHandlers.tail
 
     result
+  }
+
+  override def shutdown()(implicit context: ActorRefFactory) : Unit = {
+    handlers foreach { context.stop _ }
   }
 
   override def isEmpty: Boolean = availableHandlers.isEmpty

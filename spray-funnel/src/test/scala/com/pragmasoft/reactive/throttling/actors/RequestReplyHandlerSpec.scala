@@ -7,15 +7,22 @@ import org.specs2.mutable.Specification
 import org.specs2.time.NoTimeConversions
 import org.specs2.specification.Scope
 import spray.util.Utils
+import spray.http.HttpResponse
+
+class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
+      (implicit replyManifest: Manifest[Reply]) extends RequestReplyHandler[Reply](coordinator)(replyManifest){
+  override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit =
+    context.system.eventStream.publish(clientRequest.request.asInstanceOf[AnyRef])
+}
 
 class RequestReplyHandlerSpec extends Specification with NoTimeConversions {
 
-  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
+  val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
 
-  def createHandler[Reply](coordinator: ActorRef)(implicit manifest: Manifest[Reply]): ActorRef =
-    system.actorOf(Props(classOf[RequestReplyHandler[Reply]], coordinator, manifest))
-
-  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
+  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope {
+    def createHandler[Reply](coordinator: ActorRef)(implicit replyManifest: Manifest[Reply]): ActorRef =
+      actorSystem.actorOf(Props(classOf[PublishTimeoutFailureReplyHandler[Reply]], coordinator, replyManifest))
+  }
   
   "RequestReplyHandler" should {
     "forward request to transport" in new ActorTestScope(system) {
@@ -109,6 +116,32 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions {
       transport.reply(handler, "should be ignored")
 
       client.expectNoMsg()
+    }
+
+    "invoke request time out handler" in {
+      val systemWithNoEvents = ActorSystem("invokeRequestTimeOutHandler")
+
+      try {
+        new ActorTestScope(systemWithNoEvents) {
+          val eventListener = TestProbe()
+
+          systemWithNoEvents.eventStream.subscribe(eventListener.ref, classOf[String])
+
+          val transport = TestProbe()
+          val coordinator = TestProbe()
+          val client = TestProbe()
+          val handler = createHandler[String](coordinator.ref)
+
+          handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
+
+          // letting the timeout expiry
+          Thread.sleep(1100)
+
+          eventListener.expectMsgType[String] must be equalTo "request"
+        }
+      } finally {
+        systemWithNoEvents.shutdown()
+      }
     }
   }
 

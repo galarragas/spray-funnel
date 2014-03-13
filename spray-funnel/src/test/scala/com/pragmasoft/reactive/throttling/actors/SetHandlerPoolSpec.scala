@@ -50,6 +50,17 @@ class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
       pool.isEmpty should beTrue
     }
+
+    "shut down all pool actors when asked to" in new ActorTestScope(system) {
+      val poolActorDeathWatch = TestProbe()
+      val poolActor = TestProbe()
+      poolActorDeathWatch.watch(poolActor.ref)
+      val pool = SetHandlerPool(Set(poolActor.ref))
+
+      pool.shutdown()
+
+      poolActorDeathWatch.expectTerminated(poolActor.ref)
+    }
   }
 
 }

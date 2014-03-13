@@ -1,4 +1,4 @@
-package com.pragmasoft.reactive.throttling.http
+package com.pragmasoft.reactive.throttling.http.client
 
 import akka.actor._
 import scala.concurrent.duration._
@@ -6,44 +6,10 @@ import com.pragmasoft.reactive.throttling.actors.handlerspool.{FixedSizePool, Ha
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.ExecutionContext
 import akka.util.Timeout
-import com.pragmasoft.reactive.throttling.http.HttpRequestReplyCoordinator._
+import com.pragmasoft.reactive.throttling.http._
+import com.pragmasoft.reactive.throttling.http.client.HttpClientThrottlingCoordinator._
 
-
-
-object HttpRequestThrottling {
-
-  /**
-   * Configuration related to the Request Throttling parameters
-   *
-   * @param parallelThreshold  Max number of request active at the same time on this channel.
-   *                           parallel-threshold = infinite disables parallel request limit
-   *                           Defaults to unlimited
-   *                           Values <= 0 and == Int.MaxValue means unlimited
-   * @param timeout            Max timeout waiting for the response of any request.
-   *                           Should be a finite value.
-   *                           Defaults to 60 seconds
-   * @param expiry             Interval after which not served request will be discarded
-   *                           Defaults to Duration.Inf => no expiry
-   * @param maxQueueSize       If set to a finite value will cause to discard all messages received when t
-   *                           he queue of not served messages is higher than the threshold
-   *                           Defaults to umlimited
-   *                           Values <= 0 and Int.MaxValue mean infinite size
-  */
-  case class RequestThrottlingConfiguration(
-    parallelThreshold: Int = 0,
-    timeout : Timeout = 60.seconds,
-    expiry : Duration = Duration.Inf,
-    maxQueueSize : Int = Int.MaxValue
-  )
-
-  /**
-   * @param frequencyThreshold  Frequency threshold
-   * @param requestConfig       Request level configuration @see RequestThrottlingConfiguration
-   */
-  case class HttpThrottlingConfiguration(
-    frequencyThreshold: Frequency,
-    requestConfig : RequestThrottlingConfiguration = RequestThrottlingConfiguration()
-  )
+object HttpClientThrottling {
 
   /**
    * Creates a Quality of Service Actor forwarding every HttpRequest to the HTTP AKKA extension
@@ -111,7 +77,7 @@ object HttpRequestThrottling {
    *
    * @param frequencyThreshold Maximum frequency of requests forwarded to the transport
    * @param maxParallelRequests Maximum number of active requests through this channel
-   * @param transport The transport taking care of the request
+   * @param transport The transport actor taking care of the request
    * @param actorSystem The Actor System the new agent has to be created in
    * @param requestTimeout The Timeout to be used when waiting for responses from the transport
    * @return
@@ -129,7 +95,7 @@ object HttpRequestThrottling {
    * will be discarded
    *
    * @param frequencyThreshold Maximum frequency of requests forwarded to the transport
-   * @param transport The transport taking care of the request
+   * @param transport The transport actor taking care of the request
    * @param actorSystem The Actor System the new agent has to be created in
    * @param requestTimeout The Timeout to be used when waiting for responses from the transport
    * @return
@@ -146,13 +112,13 @@ object HttpRequestThrottling {
    * be discarded until the queue depth will become lower than the threshold.
    *
    * @param config            Threshold configuration
+   * @param transport         The transport actor taking care of the request
    * @param actorSystem       The Actor System the new agent has to be created in
-   * @param executionContext  The Execution Context to be used in handling futures
    * @return
    */
   def throttleWithConfigAndTransport(config: HttpThrottlingConfiguration, transport: ActorRef)
-                        (implicit actorSystem : ActorSystem, executionContext: ExecutionContext) : ActorRef =
-    actorSystem.actorOf(propsForConfig(config)(actorSystem, executionContext))
+                        (implicit actorSystem : ActorSystem) : ActorRef =
+    actorSystem.actorOf(propsForConfigAndTransport(config, transport))
 }
 
 

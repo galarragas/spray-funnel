@@ -1,11 +1,11 @@
 package com.pragmasoft.reactive.throttling.actors
 
 import akka.testkit.{ImplicitSender, TestProbe, TestKit}
-import akka.actor.{Props, ActorRef, ActorSystem}
+import akka.actor.{ActorRefFactory, Props, ActorRef, ActorSystem}
 import scala.concurrent.duration._
 import spray.http.HttpRequest
 import spray.client.pipelining._
-import com.pragmasoft.reactive.throttling.actors.handlerspool.{RequestHandlersPool, SetHandlerPool}
+import com.pragmasoft.reactive.throttling.actors.handlerspool.{SetHandlerPool, RequestHandlersPool}
 import org.mockito.Mockito._
 import org.mockito.Matchers._
 import akka.testkit.TestActor.AutoPilot
@@ -16,7 +16,9 @@ import org.specs2.mutable.Specification
 import org.specs2.mock._
 import spray.util.Utils
 import com.typesafe.config.ConfigFactory
-
+import com.pragmasoft.reactive.throttling.http.{DiscardReason, DiscardedClientRequest}
+import DiscardReason._
+import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
 
 class TestCoordinator[Request](
                                 transport: ActorRef,
@@ -26,11 +28,30 @@ class TestCoordinator[Request](
                                 requestExpiry: Duration,
                                 maxQueueSize: Int
                                 )(implicit manifest: Manifest[Request])
-  extends RequestReplyThrottlingCoordinator[Request](transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize)(manifest)
+  extends RequestReplyThrottlingCoordinator[Request](transport, frequencyThreshold, requestTimeout, requestExpiry, maxQueueSize)(manifest){
+
+  override def requestExpired(clientRequest: ClientRequest[Request]) : Unit = {
+    context.system.eventStream.publish( DiscardedClientRequest(Expired, clientRequest.request) )
+  }
+
+  override def requestRefused(request: Request) : Unit = {
+    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, request) )
+  }
+}
 
 class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeConversions with Mockito {
 
-  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
+  abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope {
+    val requestTimeout = 2 minutes
+
+    val transport = TestProbe()
+
+    def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: RequestHandlersPool,
+                                 requestExpiry: Duration = Duration.Inf,
+                                 maxQueueSize: Int = 0)(implicit manifest: Manifest[Request]): ActorRef =
+      actorSystem.actorOf(Props(classOf[TestCoordinator[Request]], transport.ref, frequencyThreshold, requestTimeout, handlersPool, requestExpiry, maxQueueSize, manifest))
+
+  }
 
   val testConf = ConfigFactory.parseString(
     s"""
@@ -48,17 +69,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
     """)
 
 
-  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
-
-  val requestTimeout = 2 minutes
-
-  val transport = TestProbe()
-
-  def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: RequestHandlersPool,
-                               requestExpiry: Duration = Duration.Inf,
-                               maxQueueSize: Int = 0)(implicit manifest: Manifest[Request]): ActorRef =
-    system.actorOf(Props(classOf[TestCoordinator[Request]], transport.ref, frequencyThreshold, requestTimeout, handlersPool, requestExpiry, maxQueueSize, manifest))
-
+  val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
   "RequestReplyThrottlingCoordinator" should {
 
@@ -187,7 +198,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       val coordinator = testCoordinator[HttpRequest](1 perSecond, SetHandlerPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
 
       coordinator ! Get("localhost:9090") // This is sent
-      coordinator ! Get("localhost:9091") // this is enqueued for 1 second and then expires
+      coordinator ! Get("localhost:9091") // this is enqueued for 100 millis and then expires
 
       testHandler1.expectMsgType[ClientRequest[HttpRequest]] must be equalTo ClientRequest(Get("localhost:9090"), testActor, transport.ref, requestTimeout)
 
@@ -196,6 +207,34 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       testHandler1.send(coordinator, Ready)
 
       testHandler1.expectNoMsg(1 second)
+    }
+
+    "call discard expired requests handler method" in {
+      val systemWithNoEventSent = ActorSystem("systemWithNoEventSent", testConf)
+
+      try {
+        new ActorTestScope(systemWithNoEventSent) {
+          val discardEventReceiver = TestProbe()
+
+          systemWithNoEventSent.eventStream.subscribe(discardEventReceiver.ref, classOf[DiscardedClientRequest[HttpRequest]])
+
+          val testHandler1 = TestProbe()
+          val coordinator = testCoordinator[HttpRequest](1 perSecond, SetHandlerPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
+
+          coordinator ! Get("localhost:9090") // This is sent
+          coordinator ! Get("localhost:9091/shouldExpire") // this is enqueued for 100 millis and then expires
+
+          Thread.sleep(1000)
+
+          // The message is discarded only when browsing for a new request to serve
+          testHandler1.send(coordinator, Ready)
+          testHandler1.send(coordinator, Ready)
+
+          discardEventReceiver.expectMsgType[DiscardedClientRequest[HttpRequest]] must be equalTo DiscardedClientRequest(Expired, Get("localhost:9091/shouldExpire"))
+        }
+      } finally {
+        systemWithNoEventSent.shutdown()
+      }
     }
 
     "discard request received when queue is too full" in new ActorTestScope(system) {
@@ -219,6 +258,57 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       testHandler1.expectNoMsg(1 second)
     }
 
+    "call request discarding handler method when queue is too full" in {
+      val systemWithNoEventSent = ActorSystem("systemWithNoEventSent", testConf)
+
+      try {
+        new ActorTestScope(systemWithNoEventSent) {
+          val discardEventReceiver = TestProbe()
+
+          systemWithNoEventSent.eventStream.subscribe(discardEventReceiver.ref, classOf[DiscardedClientRequest[HttpRequest]])
+
+          val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set.empty[ActorRef]), maxQueueSize = 1)
+
+          coordinator ! Get("localhost:9091") // This is enqueued
+          coordinator ! Get("localhost:9092/shouldBeDiscarded") // This should be discarded
+
+          discardEventReceiver.expectMsgType[DiscardedClientRequest[HttpRequest]] must be equalTo DiscardedClientRequest(QueueThresholdReached, Get("localhost:9092/shouldBeDiscarded"))
+        }
+      } finally {
+        systemWithNoEventSent.shutdown()
+      }
+    }
+
+    "shut down when transport terminates" in new ActorTestScope(system)  {
+
+      val deathListener = TestProbe()
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set.empty[ActorRef]), maxQueueSize = 1)
+      deathListener.watch(coordinator)
+
+      system.stop(transport.ref)
+
+      deathListener.expectTerminated(coordinator)
+    }
+
+    "shut down pool when transport terminates" in new ActorTestScope(system)  {
+
+      val handlersPool = mock[RequestHandlersPool]
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
+
+      system.stop(transport.ref)
+
+      there was one(handlersPool).shutdown()(any[ActorRefFactory])
+    }
+
+    "shut down pool when stopped" in new ActorTestScope(system)  {
+
+      val handlersPool = mock[RequestHandlersPool]
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
+
+      system.stop(coordinator)
+
+      there was one(handlersPool).shutdown()(any[ActorRefFactory])
+    }
   }
 
   step {

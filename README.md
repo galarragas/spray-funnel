@@ -9,20 +9,42 @@ Spray Client extension to allow limitation of client request frequency and numbe
 
 ## What is it?
 
-This is a generalisation of the request throttling logic implemented in the Reactive Rest Client project on my GitHub.
-The idea is to create a generic mechanism to allow the throttling of all the messages sent and received by a `sendReceive` Spray pipeline.
-The work can be easily generalised for different protocols but at the moment I'm using it with for HTTP requests.
+Spray Funnel is a request throttling system for AKKA actors that has been specifically designed to support HttpRequest - HttpReply interactions.
+It can be easily extended to support different protocols but at the moment is tested for HTTP-based interactions.
+It can be seen as an extension of the AKKA Throttler feature (http://doc.akka.io/docs/akka/snapshot/contrib/throttle.html#introduction)
+supporting Request-Reply patterns in order to provide a slightly wider set of features. It allows to limit:
 
-It allows to limit the output throughput of a Spray client in terms of:
-
-- Number of request per specified interval
-- Number of parallel request
+- The number of request per specified interval
+- Number of parallel active requests
 - Timeout after which an enqueued request has to be discarded
 - Maximum number of messages enqueued after which new incoming messages are discarded until the queue size decreases (limiting spikes)
 
+It supports throttling of Spray Client code and Spray Server code
+
+### Spray Client
+The idea is to create a generic mechanism to allow the throttling of all the messages sent and received by a `sendReceive` Spray pipeline.
+The work can be easily generalised for different protocols but at the moment I'm using it with for HTTP requests.
+
 As default uses the HTTP transport but offers the possibility of specifying a custom transport
 
+When a client request is discarded because of a timeout or because of too many enqueued requests to be served,
+a notification is sent to the Actor System `eventBus` in the form of a `DiscardedClientRequest` object containing the discarded
+request and the reason. If a request is not served in the specified request timeout an `FailedClientRequest` object is published
+in the Actor System `eventBus`
+
+### Spray Server
+
+Spray Funnel can be used to limit the amount of parallel request and the frequency of request to be served by an HTTP Server Request Handler
+similarly to the Jetty QoS filter (http://wiki.eclipse.org/Jetty/Reference/QoSFilter).
+
+All requests not forwarded to the HTTP Server Request Handler because of timeout or queue threshold limit are rejected with an
+`HttpResponse(InternalServerError)`. This will prevent the `Timedout` notification from Spray.
+In a similar fashion, all requests not served by the HTTP Server Request Handler within the specified request timeout will be completed
+ with a `HttpResponse(InternalServerError)` response.
+
 ## Usage
+
+### Spray Client
 
 There are two main types of usage of the library: creating a throttling actor during the pipeline definition to wrap the HTTP transport or using AKKA extensions
 
@@ -50,7 +72,7 @@ class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
 }
 ```
 
-The object `HttpRequestThrottling` exports the following methods:
+The object `com.pragmasoft.reactive.throttling.client.HttpClientThrottling` exports the following methods:
 
 - `throttleFrequency` to throttle the http traffic frequency only
 - `throttleFrequencyAndParallelRequests` to throttle the http traffic frequency only
@@ -80,8 +102,6 @@ Having defined the extension the Spray Client code will be written as follows:
 
 ```scala
 class SimpleSprayClient(serverBaseAddress: String, timeout : Timeout ) {
-
-  import SimpleClientProtocol._
 
   implicit val actorSystem = ActorSystem("simple-spray-client", ConfigFactory.parseResources("test.conf"))
   import actorSystem.dispatcher
@@ -123,6 +143,38 @@ qos.channels {
     }
 }
 ```
+
+### Spray Server
+
+At the moment the only supported pattern is using a singleton handler, since the wrapping funneling actor is only able to
+serve one target.
+
+A sample usage is:
+
+```scala
+
+import com.pragmasoft.reactive.throttling.http.server.HttpServerThrottling._
+
+class StubServer(interface: String, port: Int) extends Actor {
+  IO(Http).ask(Http.Bind(service, interface, port))(3.seconds)
+
+  val allConnectionsHandler = throttleFrequencyAndParallelRequests(30 perSecond, 10) { system.actorOf(... my http handler actor props here) }
+
+  override def receive: Actor.Receive = {
+    case Http.Connected(peer, _) ⇒
+      log.debug("Connected with {}", peer)
+      sender ! Http.Register(allConnectionsHandler)
+  }
+}
+
+```
+
+The object `com.pragmasoft.reactive.throttling.server.HttpServerThrottling` exports the following methods:
+
+- `throttleFrequency` to throttle the http traffic frequency only
+- `throttleFrequencyAndParallelRequests` to throttle the http traffic frequency only
+- `throttleWithConfig` to specify more complex configuration (see section about client throttling with AKKA extensions to see a decription of the configuration options)
+
 ## Adding Dependency to Spray Funnel
 
 Add conjars repository to your resolvers:

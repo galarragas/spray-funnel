@@ -1,11 +1,11 @@
-package com.pragmasoft.reactive.throttling.extension
+package com.pragmasoft.reactive.throttling.http.client.extension
 
 import akka.actor.{ExtensionKey, ActorRefFactory, ActorRef, ExtendedActorSystem}
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.ExecutionContext
 import akka.util.Timeout
 import scala.concurrent.duration._
-import com.pragmasoft.reactive.throttling.http.HttpRequestReplyCoordinator._
+import com.pragmasoft.reactive.throttling.http.client.HttpClientThrottlingCoordinator._
 import com.pragmasoft.reactive.throttling.threshold._
 import spray.can.HttpExt
 import spray.util._

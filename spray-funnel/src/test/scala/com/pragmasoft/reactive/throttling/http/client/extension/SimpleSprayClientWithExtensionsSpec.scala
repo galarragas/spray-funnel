@@ -1,4 +1,4 @@
-package com.pragmasoft.reactive.throttling.extension
+package com.pragmasoft.reactive.throttling.http.client.extension
 
 import akka.actor.{ActorSystem, ExtensionKey, ExtendedActorSystem}
 import akka.util.Timeout
@@ -144,7 +144,7 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
       val (interface, port) = Utils.temporaryServerHostnameAndPort()
 
       client = new SimpleClient(s"http://$interface:$port$servicePath", TIMEOUT)(context)
-      setup(interface, port, responseDelay)
+      setupForClientTesting(interface, port, responseDelay)
       try {
         AsResult(t)
       } finally {
