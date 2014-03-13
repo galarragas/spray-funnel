@@ -307,6 +307,8 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
       system.stop(coordinator)
 
+      Thread.sleep(1000)
+
       there was one(handlersPool).shutdown()(any[ActorRefFactory])
     }
   }
