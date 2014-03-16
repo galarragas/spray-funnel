@@ -19,6 +19,8 @@ import com.typesafe.config.ConfigFactory
 import com.pragmasoft.reactive.throttling.http.{DiscardReason, DiscardedClientRequest}
 import DiscardReason._
 import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
+import scala.util.{Failure, Try}
+import com.pragmasoft.reactive.throttling.util._
 
 class TestCoordinator[Request](
                                 transport: ActorRef,
@@ -167,7 +169,9 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
       testHandler.send(coordinator, Ready)
 
-      there was one(pool).putBack( same(testHandler.ref) )
+      withinTimeout(2 seconds) {
+        there was one(pool).putBack( same(testHandler.ref) )
+      }
     }
 
     "get actors from pool" in new ActorTestScope(system) {
@@ -183,8 +187,10 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       //need to give time to coordinator to receive the message
       handler.expectMsgClass(classOf[ClientRequest[String]])
 
-      there was one(pool).isEmpty
-      there was one(pool).get
+      withinTimeout(2 seconds) {
+        there was one(pool).isEmpty
+        there was one(pool).get
+      }
     }
 
     "discard expired requests" in new ActorTestScope(system) {
@@ -218,7 +224,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
           coordinator ! Get("localhost:9090") // This is sent
           coordinator ! Get("localhost:9091/shouldExpire") // this is enqueued for 100 millis and then expires
 
-          Thread.sleep(1000)
+          Thread.sleep(1.second.toMillis)
 
           // The message is discarded only when browsing for a new request to serve
           testHandler1.send(coordinator, Ready)
@@ -291,7 +297,9 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
       system.stop(transport.ref)
 
-      there was one(handlersPool).shutdown()(any[ActorRefFactory])
+      withinTimeout(2 seconds) {
+        there was one(handlersPool).shutdown()(any[ActorRefFactory])
+      }
     }
 
     "shut down pool when stopped" in new ActorTestScope(system)  {
@@ -301,9 +309,9 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
       system.stop(coordinator)
 
-      Thread.sleep(1000)
-
-      there was one(handlersPool).shutdown()(any[ActorRefFactory])
+      withinTimeout(2 seconds) {
+        there was one(handlersPool).shutdown()(any[ActorRefFactory])
+      }
     }
   }
 

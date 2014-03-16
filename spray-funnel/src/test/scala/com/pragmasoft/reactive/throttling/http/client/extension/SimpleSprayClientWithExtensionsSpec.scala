@@ -14,7 +14,7 @@ import org.specs2.mutable.{Around, Specification}
 import org.specs2.time.NoTimeConversions
 import spray.util.Utils
 import org.specs2.execute.{Result, AsResult}
-
+import com.pragmasoft.reactive.throttling.util._
 
 class MaxParallelRequestFunneledChannelExtension(val system: ExtendedActorSystem) extends FunneledChannelExtension {
   lazy val configRootName = "qos.channels.max-parallel-requests-channel"
@@ -96,37 +96,35 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
       val totalRequests = MAX_FREQUENCY.amount * 2
       for {id <- 0 until totalRequests} yield client.callFakeService(id)
 
-      Thread.sleep(1000)
+      withinTimeout(2 seconds) {
+        requestList(TIMEOUT).length shouldEqual MAX_FREQUENCY.amount
+      }
 
-      requestList(TIMEOUT).length shouldEqual MAX_FREQUENCY.amount
-
-      Thread.sleep(MAX_FREQUENCY.interval.toMillis)
-
-      requestList(TIMEOUT).length shouldEqual totalRequests
+      withinTimeout(MAX_FREQUENCY.interval + 100.millis) {
+        requestList(TIMEOUT).length shouldEqual totalRequests
+      }
     }
 
     s"Serve a maximun of $MAX_PARALLEL_REQUESTS requests in parallel" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
       for {id <- 0 until totalRequests} yield client.callFakeServiceWithParallelRequestLimit(id)
 
-      Thread.sleep(MAX_FREQUENCY.interval.toMillis)
+      withinTimeout(MAX_FREQUENCY.interval + 100.millis) {
+        requestList(TIMEOUT).length shouldEqual MAX_PARALLEL_REQUESTS
+      }
 
-      requestList(TIMEOUT).length shouldEqual MAX_PARALLEL_REQUESTS
-
-      Thread.sleep(1000)
-
-      requestList(TIMEOUT).length shouldEqual totalRequests
+      withinTimeout(MAX_FREQUENCY.interval) {
+        requestList(TIMEOUT).length shouldEqual totalRequests
+      }
     }
 
     "Have no concurrent request threshold for unbounded channels" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
       for {id <- 0 until totalRequests} yield { client.callFakeService(id) }
 
-      Thread.sleep(1000)
-
-      val now = System.currentTimeMillis
-      val requests = requestList(TIMEOUT)
-      requests.length shouldEqual totalRequests
+      withinTimeout(2 seconds) {
+        requestList(TIMEOUT).length shouldEqual totalRequests
+      }
     }
   }
 

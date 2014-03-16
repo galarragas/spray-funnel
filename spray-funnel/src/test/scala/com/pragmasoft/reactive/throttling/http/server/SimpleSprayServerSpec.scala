@@ -21,6 +21,7 @@ import com.pragmasoft.reactive.throttling.http.{RequestThrottlingConfiguration, 
 import scala.util.Try
 import ExecutionContext.Implicits.global
 import spray.client.UnsuccessfulResponseException
+import com.pragmasoft.reactive.throttling.util._
 
 class SimpleSprayServerSpec extends Specification with NoTimeConversions {
 
@@ -50,22 +51,22 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
     "Serve requests" in new WithStubbedApi( (actor, context) => throttleFrequency(2 every 1.second)(actor)(context) ) {
       callService(1)
 
-      Thread.sleep(1.second.toMillis)
-
-      requestList shouldEqual List(1)
+      withinTimeout(2 seconds) {
+        requestList shouldEqual List(1)
+      }
     }
 
     "Delay requests if frequency is too high" in new WithStubbedApi( (actor, context) => throttleFrequency(3 every 5.second)(actor)(context) ) {
       for(i <- 1 to 5) yield callService(i)
 
       // You can't tell the actual order of requests
-      Thread.sleep(1.second.toMillis)
+      withinTimeout(2 seconds) {
+        requestList.length shouldEqual 3
+      }
 
-      requestList.length shouldEqual 3
-
-      Thread.sleep(4.seconds.toMillis)
-
-      requestList.length shouldEqual 5
+      withinTimeout(4 seconds) {
+        requestList.length shouldEqual 5
+      }
     }
 
     "Reject requests if queue level is too high" in new WithStubbedApi(
@@ -79,20 +80,24 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
       for(i <- 1 to 5) yield callService(i)
 
       //First request is immediately done
-      Thread.sleep(1.second.toMillis)
-      requestList.length shouldEqual 1
+      withinTimeout(2 seconds) {
+        requestList.length shouldEqual 1
+      }
 
       //Second is enqueued and done after the first interval is expired
-      Thread.sleep(3.seconds.toMillis)
-      requestList.length shouldEqual 2
+      withinTimeout(3 seconds) {
+        requestList.length shouldEqual 2
+      }
 
       //Third is enqueued and done after the SECOND interval is expired
-      Thread.sleep(3.seconds.toMillis)
-      requestList.length shouldEqual 3
+      withinTimeout(3 seconds) {
+        requestList.length shouldEqual 3
+      }
 
       //Fourth and fifth are discarded
-      Thread.sleep(3.seconds.toMillis)
-      requestList.length shouldEqual 3
+      withinTimeout(3 seconds) {
+        requestList.length shouldEqual 3
+      }
     }
 
     "Return failure response for requests rejected because queue level is too high" in new WithStubbedApi(
@@ -105,17 +110,17 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
 
       val responses : Seq[Future[String]] = for(i <- 1 to 5) yield callService(i)
 
+      withinTimeout(1 seconds) {
+        val completedResponses = responses filter { _.isCompleted }
 
-      Thread.sleep(1.seconds.toMillis)
-      val completedResponses = responses filter { _.isCompleted }
+        // The first request has been successful and the last two failed immediately
+        completedResponses.length shouldEqual 3
+        val successCount = completedResponses.map( { _.value.get } ).foldLeft(0) {
+          case (count: Int, currTryResponse: Try[String]) =>  if(currTryResponse.isSuccess) count + 1 else count
+        }
 
-      // The first request has been successful and the last two failed immediately
-      completedResponses.length shouldEqual 3
-      val successCount = completedResponses.map( { _.value.get } ).foldLeft(0) {
-        case (count: Int, currTryResponse: Try[String]) =>  if(currTryResponse.isSuccess) count + 1 else count
+        successCount shouldEqual 1
       }
-
-      successCount shouldEqual 1
     }
 
     "Reject requests if they stay too long in queue" in new WithStubbedApi(
@@ -129,16 +134,17 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
       for(i <- 1 to 5) yield callService(i)
 
       //First two requests are immediately done
-      Thread.sleep(1.second.toMillis)
-      requestList.length shouldEqual 2
-
+      withinTimeout(2 seconds) {
+        requestList.length shouldEqual 2
+      }
       //Second couple is enqueued and done after the first interval is expired
-      Thread.sleep(3.seconds.toMillis)
-      requestList.length shouldEqual 4
-
+      withinTimeout(4 seconds) {
+        requestList.length shouldEqual 4
+      }
       //Fifth is never done because it expires
-      Thread.sleep(3.seconds.toMillis)
-      requestList.length shouldEqual 4
+      withinTimeout(4 seconds) {
+        requestList.length shouldEqual 4
+      }
     }
 
     "Return failure for requests expired because they were too long in queue" in new WithStubbedApi(
@@ -152,22 +158,23 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
       val responses = for(i <- 1 to 5) yield callService(i)
 
       //First two requests are immediately done
-      Thread.sleep(1.second.toMillis)
-      (responses filter { _.isCompleted }).length shouldEqual 2
-      (responses filter { _.isCompleted }) forall { _.value.get.isSuccess }
+      withinTimeout(2 seconds) {
+        (responses filter { _.isCompleted }).length shouldEqual 2
+        (responses filter { _.isCompleted }) forall { _.value.get.isSuccess } shouldEqual true
+      }
 
       //Second couple is enqueued and done after the first interval is expired
-      Thread.sleep(4.seconds.toMillis)
-      (responses filter { _.isCompleted }).length shouldEqual 4
-      (responses filter { _.isCompleted }) forall { _.value.get.isSuccess }
-
+      withinTimeout(4 seconds) {
+        (responses filter { _.isCompleted }).length shouldEqual 4
+        (responses filter { _.isCompleted }) forall { _.value.get.isSuccess } shouldEqual true
+      }
       // The expiration is detected just when a new request is received
       // 4 success and 1 failure
       callService(100)
-      Thread.sleep(1.second.toMillis)
-      responses forall { _.isCompleted } shouldEqual true
-      (responses filter { _.value.get.isSuccess }).length
-
+      withinTimeout(4 seconds) {
+        responses forall { _.isCompleted } shouldEqual true
+        (responses filter { _.value.get.isSuccess }).length shouldEqual 4
+      }
     }
 
 
@@ -180,14 +187,14 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
       ) {
       for(i <- 1 to 4) yield callService(i)
 
-      Thread.sleep(3.seconds.toMillis)
+      withinTimeout(3 seconds) {
+        // Can only perform 'maxParallelRequests' requests because of the delay
+        requestList.length shouldEqual 2
+      }
 
-      // Can only perform 'maxParallelRequests' requests because of the delay
-      requestList.length shouldEqual 2
-
-      Thread.sleep(1.second.toMillis)
-
-      requestList.length shouldEqual 4
+      withinTimeout(4 seconds) {
+        requestList.length shouldEqual 4
+      }
     }
 
     "Fail with timeout error if server is slower than configured timeout" in new WithStubbedApi(
@@ -203,14 +210,15 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
       // I CAN'T TELL SPRAY TO DO MORE THAN 4 PARALLEL CONNECTIONS TO THE SERVER SO I'M TESTING WITH ONLY 4 REQUESTS
       val responses : Seq[Future[String]] = for(i <- 1 to 4) yield callService(i)
 
-      Thread.sleep(3.seconds.toMillis)
-      responses forall { _.isCompleted } shouldEqual true
+      withinTimeout(4 seconds) {
+        responses forall { _.isCompleted } shouldEqual true
 
-      val failureCount = responses.map( { _.value.get } ).foldLeft(0) {
-        case (count: Int, currTryResponse: Try[String]) =>  if(currTryResponse.isFailure) count + 1 else count
+        val failureCount = responses.map( { _.value.get } ).foldLeft(0) {
+          case (count: Int, currTryResponse: Try[String]) =>  if(currTryResponse.isFailure) count + 1 else count
+        }
+
+        failureCount shouldEqual responses.length
       }
-
-      failureCount shouldEqual responses.length
     }
   }
 

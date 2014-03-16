@@ -13,6 +13,7 @@ import org.specs2.time.NoTimeConversions
 import org.specs2.execute.{Result, AsResult}
 import spray.http.HttpResponse
 import com.pragmasoft.reactive.throttling.threshold.Frequency
+import com.pragmasoft.reactive.throttling.util._
 
 
 class SimpleClient(serviceAddress: String, frequency: Frequency, parallelRequests: Int, timeout: Timeout)(implicit val actorSystem: ActorSystem) {
@@ -68,13 +69,13 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
       val totalRequests = MAX_FREQUENCY.amount * 2
       for {id <- 1 to totalRequests} yield client.callFakeService(id)
 
-      Thread.sleep(1000)
+      withinTimeout(2 seconds) {
+        requestList(TIMEOUT).length shouldEqual MAX_FREQUENCY.amount
+      }
 
-      requestList(TIMEOUT).length shouldEqual MAX_FREQUENCY.amount
-
-      Thread.sleep(MAX_FREQUENCY.interval.toMillis)
-
-      requestList(TIMEOUT).length shouldEqual totalRequests
+      withinTimeout(MAX_FREQUENCY.interval) {
+        requestList(TIMEOUT).length shouldEqual totalRequests
+      }
     }
 
     s"Serve a maximun of $MAX_PARALLEL_REQUESTS requests in parallel" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
@@ -85,19 +86,19 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
 
       requestList(TIMEOUT).length shouldEqual MAX_PARALLEL_REQUESTS
 
-      Thread.sleep(2.second.toMillis)
-
-      requestList(TIMEOUT).length shouldEqual totalRequests
+      withinTimeout(2 seconds) {
+        requestList(TIMEOUT).length shouldEqual totalRequests
+      }
     }
 
     "Have no concurrent request threshold for unbounded channels" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
       for {id <- 1 to totalRequests} yield { client.callFakeService(id) }
 
-      Thread.sleep(1.second.toMillis)
-
-      val requests = requestList(TIMEOUT)
-      requests.length shouldEqual totalRequests
+      withinTimeout(1 second) {
+        val requests = requestList(TIMEOUT)
+        requests.length shouldEqual totalRequests
+      }
     }
   }
 
