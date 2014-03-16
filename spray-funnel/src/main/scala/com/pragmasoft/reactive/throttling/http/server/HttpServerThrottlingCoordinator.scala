@@ -33,9 +33,11 @@ object HttpServerRequestReplyHandler {
 }
 
 class HttpServerRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
-    override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit =
+    override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit = {
+      log.info("Request {} timed out!!", clientRequest)
       clientRequest.client ! HttpResponse(StatusCodes.InternalServerError,
         "The server was not able to produce a timely response to your request.")
+    }
 }
 
 
@@ -52,11 +54,13 @@ abstract class AbstractHttpServerThrottlingCoordinator(
   override def createHandler() = context.actorOf(HttpServerRequestReplyHandler.props(self))
 
   override def requestExpired(clientRequest: ClientRequest[HttpRequest]) : Unit = {
-    context.system.eventStream.publish( DiscardedClientRequest(Expired, clientRequest.request) )
+    log.info("Sending failure response")
+    clientRequest.client ! HttpResponse(StatusCodes.BandwidthLimitExceeded, "The server was not able to produce a timely response to your request.")
   }
 
-  override def requestRefused(request: HttpRequest) : Unit = {
-    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, request) )
+  override def requestRefused(clientRequest: ClientRequest[HttpRequest]) : Unit = {
+    log.info("Sending failure response")
+    clientRequest.client ! HttpResponse(StatusCodes.BandwidthLimitExceeded, "The server workload was too high to allow to service your request.")
   }
 
   override def postStop(): Unit = {

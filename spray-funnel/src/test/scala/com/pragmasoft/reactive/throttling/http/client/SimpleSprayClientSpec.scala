@@ -37,8 +37,6 @@ class SimpleClient(serviceAddress: String, frequency: Frequency, parallelRequest
   def readResponse(httpResponse: Future[HttpResponse]): Future[String] = httpResponse map {
     _.entity.asString
   }
-
-  def shutdown() = actorSystem.shutdown()
 }
 
 
@@ -56,6 +54,7 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
     }
 
     akka {
+      log-dead-letters-during-shutdown = off
       loglevel = ERROR
       loggers = ["akka.event.slf4j.Slf4jLogger"]
     }
@@ -67,7 +66,7 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
     s"Enqueue requests to do maximum $MAX_FREQUENCY" in new WithStubbedApi {
 
       val totalRequests = MAX_FREQUENCY.amount * 2
-      for {id <- 0 to totalRequests} yield client.callFakeService(id)
+      for {id <- 1 to totalRequests} yield client.callFakeService(id)
 
       Thread.sleep(1000)
 
@@ -80,24 +79,23 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
 
     s"Serve a maximun of $MAX_PARALLEL_REQUESTS requests in parallel" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
-      for {id <- 0 to totalRequests} yield client.callFakeServiceWithMaxParallelRequests(id)
+      for {id <- 1 to totalRequests} yield client.callFakeServiceWithMaxParallelRequests(id)
 
       Thread.sleep(MAX_FREQUENCY.interval.toMillis)
 
       requestList(TIMEOUT).length shouldEqual MAX_PARALLEL_REQUESTS
 
-      Thread.sleep(1000)
+      Thread.sleep(2.second.toMillis)
 
       requestList(TIMEOUT).length shouldEqual totalRequests
     }
 
     "Have no concurrent request threshold for unbounded channels" in new WithStubbedApi(responseDelay = MAX_FREQUENCY.interval) {
       val totalRequests = MAX_PARALLEL_REQUESTS + 1
-      for {id <- 0 until totalRequests} yield { client.callFakeService(id) }
+      for {id <- 1 to totalRequests} yield { client.callFakeService(id) }
 
-      Thread.sleep(1000)
+      Thread.sleep(1.second.toMillis)
 
-      val now = System.currentTimeMillis
       val requests = requestList(TIMEOUT)
       requests.length shouldEqual totalRequests
     }
@@ -120,9 +118,6 @@ class SimpleSprayClientSpec extends Specification with NoTimeConversions {
       try {
         AsResult(t)
       } finally {
-        if (client != null)
-          client.shutdown()
-
         shutdown()
 
         context.shutdown()

@@ -55,6 +55,7 @@ abstract class RequestReplyThrottlingCoordinator[Request](
 
   override def receive: Actor.Receive = {
     case Ready =>
+      log.debug("Actor {} finished its work", sender)
       handlersPool putBack sender
       tryToServeRequest()
 
@@ -63,17 +64,14 @@ abstract class RequestReplyThrottlingCoordinator[Request](
       tryToServeRequest()
 
     case request if(manifest.runtimeClass.isAssignableFrom(request.getClass) ) =>
+      val clientRequest = ClientRequest(request.asInstanceOf[Request], sender, targetRequestHandler, requestTimeout)
       if( isUnboundQueue || (requestsToServe.count() < maxQueueSize) ) {
-        requestsToServe.add(
-           ExpiryingClientRequest(
-             ClientRequest(request.asInstanceOf[Request], sender, targetRequestHandler, requestTimeout),
-             getMessageExpiry
-           )
-         )
+        log.debug("Received request {}", request)
+        requestsToServe.add( ExpiryingClientRequest(clientRequest, getMessageExpiry) )
         tryToServeRequest()
       } else {
         log.debug( "Discarding request {}. Queue has size {} greater than allowed of {}", request, requestsToServe.count(), maxQueueSize )
-        requestRefused(request.asInstanceOf[Request])
+        requestRefused(clientRequest)
       }
 
     case Terminated(`targetRequestHandler`) =>
@@ -104,13 +102,15 @@ abstract class RequestReplyThrottlingCoordinator[Request](
 
   def requestExpired(clientRequest: ClientRequest[Request]) : Unit
 
-  def requestRefused(request: Request) : Unit
+  def requestRefused(clientRequest: ClientRequest[Request]) : Unit
 
   def tryToServeRequest() : Unit = {
     if( (leftRequestAllowanceForThisInterval > 0) && !handlersPool.isEmpty ) {
       nextRequest() match {
         case Some(request) =>
-          handlersPool.get() ! request
+          val handler = handlersPool.get()
+          log.debug("Serving request {} with handler {}", request, handler)
+          handler ! request
           leftRequestAllowanceForThisInterval -= 1
         case None =>
           log.debug(s"No messages left to be sent and $leftRequestAllowanceForThisInterval messages still allowed to be sent in this interval")

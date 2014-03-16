@@ -7,12 +7,23 @@ import spray.util.Utils
 import org.specs2.mutable.Specification
 import org.specs2.time.NoTimeConversions
 import com.pragmasoft.reactive.throttling.actors.handlerspool.SetHandlerPool
+import com.typesafe.config.ConfigFactory
 
 class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
+  val testConf = ConfigFactory.parseString(
+    """
+    akka {
+      loglevel = INFO
+      loggers = ["akka.event.slf4j.Slf4jLogger"]
+      log-dead-letters-during-shutdown=off
+    }
+    """
+  )
+
   abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope
 
-  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
+  implicit val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
   "SetHandlersPool" should {
 

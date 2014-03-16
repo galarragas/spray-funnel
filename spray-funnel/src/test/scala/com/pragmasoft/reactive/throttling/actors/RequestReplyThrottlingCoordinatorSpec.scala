@@ -34,8 +34,8 @@ class TestCoordinator[Request](
     context.system.eventStream.publish( DiscardedClientRequest(Expired, clientRequest.request) )
   }
 
-  override def requestRefused(request: Request) : Unit = {
-    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, request) )
+  override def requestRefused(clientRequest: ClientRequest[Request]) : Unit = {
+    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, clientRequest.request) )
   }
 }
 
@@ -54,17 +54,11 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
   }
 
   val testConf = ConfigFactory.parseString(
-    s"""
-    spray.can {
-      host-connector {
-        max-redirects = 5
-      }
-      server.remote-address-header = on
-    }
-
+    """
     akka {
       loglevel = INFO
       loggers = ["akka.event.slf4j.Slf4jLogger"]
+      log-dead-letters-during-shutdown=off
     }
     """)
 

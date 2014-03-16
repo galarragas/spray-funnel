@@ -40,8 +40,6 @@ class SimpleClient(serviceAddress: String, timeout: Timeout)(implicit val actorS
 
   def callFakeServiceWithParallelRequestLimit(id: Int): Future[String] = maxParalellRequestPipeline { Get(s"$serviceAddress?id=$id")  }
 
-  def shutdown() = actorSystem.shutdown()
-
   def readResponse(httpResponse: Future[HttpResponse]): Future[String] = httpResponse map {
     _.entity.asString
   }
@@ -148,9 +146,6 @@ class SimpleSprayClientWithExtensionsSpec extends Specification with NoTimeConve
       try {
         AsResult(t)
       } finally {
-        if (client != null)
-          client.shutdown()
-
         shutdown()
 
         context.shutdown()

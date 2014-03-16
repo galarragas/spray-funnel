@@ -8,6 +8,7 @@ import org.specs2.time.NoTimeConversions
 import org.specs2.specification.Scope
 import spray.util.Utils
 import spray.http.HttpResponse
+import com.typesafe.config.ConfigFactory
 
 class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
       (implicit replyManifest: Manifest[Reply]) extends RequestReplyHandler[Reply](coordinator)(replyManifest){
@@ -17,7 +18,17 @@ class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
 
 class RequestReplyHandlerSpec extends Specification with NoTimeConversions {
 
-  val system = ActorSystem(Utils.actorSystemNameFrom(getClass))
+  val testConf = ConfigFactory.parseString(
+    """
+    akka {
+      loglevel = INFO
+      loggers = ["akka.event.slf4j.Slf4jLogger"]
+      log-dead-letters-during-shutdown=off
+    }
+    """)
+
+
+  val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
   abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope {
     def createHandler[Reply](coordinator: ActorRef)(implicit replyManifest: Manifest[Reply]): ActorRef =

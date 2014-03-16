@@ -38,7 +38,7 @@ Spray Funnel can be used to limit the amount of parallel request and the frequen
 similarly to the Jetty QoS filter (http://wiki.eclipse.org/Jetty/Reference/QoSFilter).
 
 All requests not forwarded to the HTTP Server Request Handler because of timeout or queue threshold limit are rejected with an
-`HttpResponse(InternalServerError)`. This will prevent the `Timedout` notification from Spray.
+`HttpResponse(BandwidthLimitExceeded)`. This will prevent the `Timedout` notification from Spray.
 In a similar fashion, all requests not served by the HTTP Server Request Handler within the specified request timeout will be completed
  with a `HttpResponse(InternalServerError)` response.
 
@@ -186,7 +186,7 @@ resolvers += "ConJars" at "http://conjars.org/repo",
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "0.2"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC2"
 ```
 
 ## Dependencies:

@@ -46,8 +46,8 @@ abstract class AbstractHttpClientThrottlingCoordinator(
     context.system.eventStream.publish( DiscardedClientRequest(Expired, clientRequest.request) )
   }
 
-  override def requestRefused(request: HttpRequest) : Unit = {
-    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, request) )
+  override def requestRefused(clientRequest: ClientRequest[HttpRequest]) : Unit = {
+    context.system.eventStream.publish( DiscardedClientRequest(QueueThresholdReached, clientRequest.request) )
   }
 }
 
