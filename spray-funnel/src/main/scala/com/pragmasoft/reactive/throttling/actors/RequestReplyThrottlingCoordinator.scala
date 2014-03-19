@@ -4,7 +4,7 @@ import akka.actor._
 import akka.dispatch.AbstractNodeQueue
 import akka.actor.SupervisorStrategy.Resume
 import scala.concurrent.duration._
-import com.pragmasoft.reactive.throttling.actors.handlerspool.RequestHandlersPool
+import com.pragmasoft.reactive.throttling.actors.handlerspool.ActorPool
 import scala.Some
 import akka.actor.OneForOneStrategy
 import com.pragmasoft.reactive.throttling.threshold.Frequency
@@ -36,7 +36,7 @@ abstract class RequestReplyThrottlingCoordinator[Request](
 
   import context.dispatcher
 
-  def handlersPool : RequestHandlersPool
+  def handlersPool : ActorPool
 
   class RequestQueue extends AbstractNodeQueue[ExpiryingClientRequest]
 

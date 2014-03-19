@@ -5,5 +5,5 @@ trait FixedSizePool {
 
   def poolSize: Int
 
-  val handlersPool: RequestHandlersPool = SetHandlerPool(poolSize)(createHandler)
+  val handlersPool: ActorPool = SetActorPool(poolSize)(createHandler)
 }

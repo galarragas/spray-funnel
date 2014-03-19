@@ -6,7 +6,7 @@ import org.specs2.specification.Scope
 import spray.util.Utils
 import org.specs2.mutable.Specification
 import org.specs2.time.NoTimeConversions
-import com.pragmasoft.reactive.throttling.actors.handlerspool.SetHandlerPool
+import com.pragmasoft.reactive.throttling.actors.handlerspool.SetActorPool
 import com.typesafe.config.ConfigFactory
 
 class SetHandlerPoolSpec extends Specification with NoTimeConversions {
@@ -31,7 +31,7 @@ class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
       val handlers = Set(TestProbe().ref, TestProbe().ref, TestProbe().ref)
 
-      val pool = SetHandlerPool(handlers)
+      val pool = SetActorPool(handlers)
 
       val retrievedHandlers = Set(pool.get(), pool.get(), pool.get())
 
@@ -40,7 +40,7 @@ class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
     "return the content of the underlying set when building with size and factory method" in new ActorTestScope(system) {
 
-      val pool = SetHandlerPool(3) {
+      val pool = SetActorPool(3) {
         () => TestProbe().ref
       }
 
@@ -51,11 +51,11 @@ class SetHandlerPoolSpec extends Specification with NoTimeConversions {
 
 
     "not be empty when having content" in new ActorTestScope(system) {
-      SetHandlerPool(Set(TestProbe().ref)).isEmpty should beFalse
+      SetActorPool(Set(TestProbe().ref)).isEmpty should beFalse
     }
 
     "become empty when retrieving all content" in {
-      val pool = SetHandlerPool(Set(TestProbe().ref))
+      val pool = SetActorPool(Set(TestProbe().ref))
 
       pool.get()
 
@@ -66,7 +66,7 @@ class SetHandlerPoolSpec extends Specification with NoTimeConversions {
       val poolActorDeathWatch = TestProbe()
       val poolActor = TestProbe()
       poolActorDeathWatch.watch(poolActor.ref)
-      val pool = SetHandlerPool(Set(poolActor.ref))
+      val pool = SetActorPool(Set(poolActor.ref))
 
       pool.shutdown()
 

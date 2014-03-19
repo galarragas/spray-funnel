@@ -5,7 +5,7 @@ import akka.actor.{ActorRefFactory, Props, ActorRef, ActorSystem}
 import scala.concurrent.duration._
 import spray.http.HttpRequest
 import spray.client.pipelining._
-import com.pragmasoft.reactive.throttling.actors.handlerspool.{SetHandlerPool, RequestHandlersPool}
+import com.pragmasoft.reactive.throttling.actors.handlerspool.{SetActorPool, ActorPool}
 import org.mockito.Mockito._
 import org.mockito.Matchers._
 import akka.testkit.TestActor.AutoPilot
@@ -26,7 +26,7 @@ class TestCoordinator[Request](
                                 transport: ActorRef,
                                 frequencyThreshold: Frequency,
                                 requestTimeout: FiniteDuration,
-                                val handlersPool: RequestHandlersPool,
+                                val handlersPool: ActorPool,
                                 requestExpiry: Duration,
                                 maxQueueSize: Int
                                 )(implicit manifest: Manifest[Request])
@@ -48,7 +48,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     val transport = TestProbe()
 
-    def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: RequestHandlersPool,
+    def testCoordinator[Request](frequencyThreshold: Frequency, handlersPool: ActorPool,
                                  requestExpiry: Duration = Duration.Inf,
                                  maxQueueSize: Int = 0)(implicit manifest: Manifest[Request]): ActorRef =
       actorSystem.actorOf(Props(classOf[TestCoordinator[Request]], transport.ref, frequencyThreshold, requestTimeout, handlersPool, requestExpiry, maxQueueSize, manifest))
@@ -71,7 +71,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "forward request to handler if available" in new ActorTestScope(system) {
       val testHandler = TestProbe()
-      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set(testHandler.ref)))
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set(testHandler.ref)))
 
       coordinator ! Get("localhost:9090")
 
@@ -82,7 +82,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       val testHandler1 = TestProbe()
       val testHandler2 = TestProbe()
 
-      val handlersPool = mock[RequestHandlersPool]
+      val handlersPool = mock[ActorPool]
       when(handlersPool.get()).thenReturn(testHandler1.ref).thenReturn(testHandler2.ref)
 
       val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
@@ -97,7 +97,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
       val testHandler1 = TestProbe()
       val testHandler2 = TestProbe()
 
-      val handlersPool = mock[RequestHandlersPool]
+      val handlersPool = mock[ActorPool]
       when(handlersPool.get()).thenReturn(testHandler1.ref).thenReturn(testHandler2.ref)
 
       val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
@@ -111,7 +111,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "not serve requests until one of the available actors is available" in new ActorTestScope(system) {
       val testHandler1 = TestProbe()
-      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set(testHandler1.ref)))
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set(testHandler1.ref)))
 
       coordinator ! Get("localhost:9090")
       coordinator ! Get("localhost:9091")
@@ -129,7 +129,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
     "delay request if serving more than allowed per interval" in new ActorTestScope(system) {
       val testHandler = TestProbe()
 
-      val alwaysHasHandlersAvailable = mock[RequestHandlersPool]
+      val alwaysHasHandlersAvailable = mock[ActorPool]
       when(alwaysHasHandlersAvailable.get()).thenReturn(testHandler.ref)
       when(alwaysHasHandlersAvailable.isEmpty).thenReturn(false)
 
@@ -150,7 +150,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "ignore messages of wrong type" in new ActorTestScope(system) {
       val testHandler = TestProbe()
-      val coordinator = testCoordinator[String](10 perSecond, SetHandlerPool(Set(testHandler.ref)))
+      val coordinator = testCoordinator[String](10 perSecond, SetActorPool(Set(testHandler.ref)))
 
       coordinator ! Get("localhost:9093")
       coordinator ! "I should be handled"
@@ -161,7 +161,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
     "return actors to pool" in new ActorTestScope(system) {
       val testHandler = TestProbe()
 
-      val pool = mock[RequestHandlersPool]
+      val pool = mock[ActorPool]
       when(pool.get()).thenReturn(testHandler.ref)
       when(pool.isEmpty).thenReturn(false)
 
@@ -176,7 +176,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "get actors from pool" in new ActorTestScope(system) {
       val handler = TestProbe()
-      val pool = mock[RequestHandlersPool]
+      val pool = mock[ActorPool]
       when(pool.get()).thenReturn(handler.ref)
       when(pool.isEmpty).thenReturn(false)
 
@@ -195,7 +195,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "discard expired requests" in new ActorTestScope(system) {
       val testHandler1 = TestProbe()
-      val coordinator = testCoordinator[HttpRequest](1 perSecond, SetHandlerPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
+      val coordinator = testCoordinator[HttpRequest](1 perSecond, SetActorPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
 
       coordinator ! Get("localhost:9090") // This is sent
       coordinator ! Get("localhost:9091") // this is enqueued for 100 millis and then expires
@@ -219,7 +219,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
           systemWithNoEventSent.eventStream.subscribe(discardEventReceiver.ref, classOf[DiscardedClientRequest[HttpRequest]])
 
           val testHandler1 = TestProbe()
-          val coordinator = testCoordinator[HttpRequest](1 perSecond, SetHandlerPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
+          val coordinator = testCoordinator[HttpRequest](1 perSecond, SetActorPool(Set(testHandler1.ref)), requestExpiry = 100 milliseconds)
 
           coordinator ! Get("localhost:9090") // This is sent
           coordinator ! Get("localhost:9091/shouldExpire") // this is enqueued for 100 millis and then expires
@@ -239,7 +239,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "discard request received when queue is too full" in new ActorTestScope(system) {
       val testHandler1 = TestProbe()
-      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set(testHandler1.ref)), maxQueueSize = 1)
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set(testHandler1.ref)), maxQueueSize = 1)
 
       coordinator ! Get("localhost:9090") // This is sent
       coordinator ! Get("localhost:9091") // This is enqueued
@@ -267,7 +267,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
           systemWithNoEventSent.eventStream.subscribe(discardEventReceiver.ref, classOf[DiscardedClientRequest[HttpRequest]])
 
-          val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set.empty[ActorRef]), maxQueueSize = 1)
+          val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set.empty[ActorRef]), maxQueueSize = 1)
 
           coordinator ! Get("localhost:9091") // This is enqueued
           coordinator ! Get("localhost:9092/shouldBeDiscarded") // This should be discarded
@@ -282,7 +282,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
     "shut down when transport terminates" in new ActorTestScope(system)  {
 
       val deathListener = TestProbe()
-      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetHandlerPool(Set.empty[ActorRef]), maxQueueSize = 1)
+      val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set.empty[ActorRef]), maxQueueSize = 1)
       deathListener.watch(coordinator)
 
       system.stop(transport.ref)
@@ -292,7 +292,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "shut down pool when transport terminates" in new ActorTestScope(system)  {
 
-      val handlersPool = mock[RequestHandlersPool]
+      val handlersPool = mock[ActorPool]
       val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
 
       system.stop(transport.ref)
@@ -304,7 +304,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
     "shut down pool when stopped" in new ActorTestScope(system)  {
 
-      val handlersPool = mock[RequestHandlersPool]
+      val handlersPool = mock[ActorPool]
       val coordinator = testCoordinator[HttpRequest](10 perSecond, handlersPool)
 
       system.stop(coordinator)

@@ -2,7 +2,7 @@ package com.pragmasoft.reactive.throttling.actors.handlerspool
 
 import akka.actor.{ActorRefFactory, ActorContext, ActorSystem, ActorRef}
 
-trait RequestHandlersPool {
+trait ActorPool {
   def isEmpty : Boolean
   def get() : ActorRef
   def putBack(handler: ActorRef) : Unit

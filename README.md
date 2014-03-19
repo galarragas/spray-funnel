@@ -173,7 +173,14 @@ The object `com.pragmasoft.reactive.throttling.server.HttpServerThrottling` expo
 
 - `throttleFrequency` to throttle the http traffic frequency only
 - `throttleFrequencyAndParallelRequests` to throttle the http traffic frequency only
-- `throttleWithConfig` to specify more complex configuration (see section about client throttling with AKKA extensions to see a decription of the configuration options)
+- `throttleWithConfig` to specify more complex configuration (see section about client throttling with AKKA extensions to see a description of the configuration options)
+
+
+### Settings already available in Spray
+The parallel request limitation can be done in Spray using the `spray.can.server.pipelining-limit` parameter. This setting
+will limit the number of active request per connection. The throttling available using spray-funnel instead can be used across
+connections using the singleton pattern or with more sophisticated logic as for example one throttle per IP address just
+using different funnels.
 
 ## Adding Dependency to Spray Funnel
 

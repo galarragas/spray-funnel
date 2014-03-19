@@ -9,7 +9,16 @@ import akka.util.Timeout
 import spray.http.{HttpRequest, StatusCodes, HttpResponse}
 import scala.reflect.ManifestFactory
 
-
+/**
+ * Actor responsible of tracking the current Request-Reply interaction. Will determine when the request has been
+ * served and notify it to the coordinator
+ *
+ * Will drop any message not of the given type Reply
+ *
+ * @param coordinator
+ * @param replyManifest
+ * @tparam Reply
+ */
 abstract class RequestReplyHandler[Reply](coordinator: ActorRef)(implicit replyManifest: Manifest[Reply]) extends Actor with ActorLogging {
 
   import context.dispatcher
@@ -41,12 +50,4 @@ abstract class RequestReplyHandler[Reply](coordinator: ActorRef)(implicit replyM
   }
 
   def requestTimedOut(clientRequest: ClientRequest[Any]): Unit
-}
-
-
-class HttpServerRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler[HttpResponse](coordinator)  {
-  override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit = {
-    // Verify right code to use
-    clientRequest.client ! HttpResponse(StatusCodes.RequestTimeout)
-  }
 }
