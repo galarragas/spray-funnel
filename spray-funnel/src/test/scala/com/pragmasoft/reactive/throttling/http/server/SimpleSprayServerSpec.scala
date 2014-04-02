@@ -64,7 +64,8 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
         requestList.length shouldEqual 3
       }
 
-      withinTimeout(4 seconds) {
+      // Before the second time frame is ended
+      withinTimeout(6 seconds) {
         requestList.length shouldEqual 5
       }
     }
@@ -168,6 +169,7 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
         (responses filter { _.isCompleted }).length shouldEqual 4
         (responses filter { _.isCompleted }) forall { _.value.get.isSuccess } shouldEqual true
       }
+
       // The expiration is detected just when a new request is received
       // 4 success and 1 failure
       callService(100)
