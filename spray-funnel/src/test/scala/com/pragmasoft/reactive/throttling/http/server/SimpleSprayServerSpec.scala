@@ -177,7 +177,7 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions {
         responses forall { _.isCompleted } shouldEqual true
         (responses filter { _.value.get.isSuccess }).length shouldEqual 4
       }
-    }.pendingUntilFixed("Flaky test with random failures")
+    }
 
 
     "Throttle parallel requests" in new WithStubbedApi(
