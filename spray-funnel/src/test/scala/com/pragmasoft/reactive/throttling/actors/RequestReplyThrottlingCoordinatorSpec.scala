@@ -41,7 +41,7 @@ class TestCoordinator[Request](
   }
 }
 
-class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeConversions with Mockito {
+class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeConversions with Mockito with RetryExamples {
 
   abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope {
     val requestTimeout = 2 minutes
@@ -69,7 +69,7 @@ class RequestReplyThrottlingCoordinatorSpec extends Specification with NoTimeCon
 
   "RequestReplyThrottlingCoordinator" should {
 
-    "forward request to handler if available" in new ActorTestScope(system) {
+    "forward request to handler if available" in  new ActorTestScope(system) {
       val testHandler = TestProbe()
       val coordinator = testCoordinator[HttpRequest](10 perSecond, SetActorPool(Set(testHandler.ref)))
 

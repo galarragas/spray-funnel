@@ -9,6 +9,7 @@ import org.specs2.specification.Scope
 import spray.util.Utils
 import spray.http.HttpResponse
 import com.typesafe.config.ConfigFactory
+import com.pragmasoft.reactive.throttling.util.RetryExamples
 
 class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
       (implicit replyManifest: Manifest[Reply]) extends RequestReplyHandler[Reply](coordinator)(replyManifest){
@@ -16,7 +17,7 @@ class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
     context.system.eventStream.publish(clientRequest.request.asInstanceOf[AnyRef])
 }
 
-class RequestReplyHandlerSpec extends Specification with NoTimeConversions {
+class RequestReplyHandlerSpec extends Specification with NoTimeConversions with RetryExamples {
 
   val testConf = ConfigFactory.parseString(
     """

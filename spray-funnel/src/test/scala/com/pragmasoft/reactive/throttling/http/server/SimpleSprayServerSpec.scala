@@ -23,7 +23,7 @@ import ExecutionContext.Implicits.global
 import spray.client.UnsuccessfulResponseException
 import com.pragmasoft.reactive.throttling.util._
 
-class SimpleSprayServerSpec extends Specification with NoTimeConversions {
+class SimpleSprayServerSpec extends Specification with NoTimeConversions with RetryExamples {
 
   val testConf = ConfigFactory.parseString(
     """

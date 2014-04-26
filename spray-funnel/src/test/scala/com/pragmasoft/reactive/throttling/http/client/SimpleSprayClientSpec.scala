@@ -41,7 +41,7 @@ class SimpleClient(serviceAddress: String, frequency: Frequency, parallelRequest
 }
 
 
-class SimpleSprayClientSpec extends Specification with NoTimeConversions {
+class SimpleSprayClientSpec extends Specification with NoTimeConversions with RetryExamples {
   val MAX_FREQUENCY: Frequency = 5 every (15 seconds)
   val MAX_PARALLEL_REQUESTS = 3
   val TIMEOUT: Timeout = MAX_FREQUENCY.interval * 3
