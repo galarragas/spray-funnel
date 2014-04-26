@@ -193,7 +193,7 @@ resolvers += "ConJars" at "http://conjars.org/repo",
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC2"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3"
 ```
 
 ## Dependencies:
