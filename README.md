@@ -157,11 +157,9 @@ publish an event on the System `eventStream` with a copy of the failed request a
 The reason of failure and associated events are:
 
 - The request failed because of a timeout: In this case an event of type `FailedClientRequest` with reason `Expired` is generated
-
 - The request has been discarded according to the configuration of the channel throttler. The reasons can be two:
-
--- Max queue depth reached: In this case an event of type `DiscardedClientRequest` is generated with reason equal to `QueueThresholdReached`
--- Request have been in the processing queue more than the configured `expiry` parameter. In this case an event of type `DiscardedClientRequest` is generated with reason equal to `Expired`
+ - Max queue depth reached: In this case an event of type `DiscardedClientRequest` is generated with reason equal to `QueueThresholdReached`
+ - Request have been in the processing queue more than the configured `expiry` parameter. In this case an event of type `DiscardedClientRequest` is generated with reason equal to `Expired`
 
 
 ### Spray Server
