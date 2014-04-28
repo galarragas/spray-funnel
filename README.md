@@ -131,13 +131,19 @@ qos.channels {
         requests {
             # Max number of request active at the same time on this channel
             # parallel-threshold = infinite disables parallel request limit
+            # When a request times out an event of type FailedClientRequest with parameter reason equal to Timeout
+            # and a copy the discarded request is generated
             parallel-threshold = 3
             # Max timeout waiting for the response of any request. Should be a finite value
             timeout = 45 s
             # Interval after which not served request will be discarded
+            # When a request is discarded an event of type DiscardedClientRequest with parameter reason equal to Expired
+            # and a copy the discarded request is generated
             expiry = infinite
             # If set to a finite value will cause to discard all messages received when the queue of not served
             # messages is higher than the threshold
+            # When a request is discarded an event of type DiscardedClientRequest with parameter reason equal to QueueThresholdReached
+            # and a copy the discarded request is generated
             max-queue-size = infinite
         }
     }
