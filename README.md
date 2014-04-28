@@ -219,13 +219,27 @@ libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3"
 Runtime:
 
 - Scala 2.10
-- Spray Client 1.2.0
+- Spray 1.2.0
 - Akka 2.2.3
 
 Test:
 
 - Akka_testkit 2.2.3
 - Specs2 2.2.3
+
+## Support of Spray 1.3
+
+Current version is not working propery with version 1.3 of spray (see issue #2).
+Version `1.0-RC3-spray1.3` has been built with the following dependencies
+
+- Scala 2.10
+- Spray 1.3.1
+- Akka 2.3.2
+
+```
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3-spray1.3"
+```
+
 
 ## License
 
