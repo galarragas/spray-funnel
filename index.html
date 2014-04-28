@@ -170,20 +170,44 @@ limit the traffic of your pipeline</p>
         requests {
             # Max number of request active at the same time on this channel
             # parallel-threshold = infinite disables parallel request limit
+            # When a request times out an event of type FailedClientRequest with parameter reason equal to Timeout
+            # and a copy the discarded request is generated
             parallel-threshold = 3
             # Max timeout waiting for the response of any request. Should be a finite value
             timeout = 45 s
             # Interval after which not served request will be discarded
+            # When a request is discarded an event of type DiscardedClientRequest with parameter reason equal to Expired
+            # and a copy the discarded request is generated
             expiry = infinite
             # If set to a finite value will cause to discard all messages received when the queue of not served
             # messages is higher than the threshold
+            # When a request is discarded an event of type DiscardedClientRequest with parameter reason equal to QueueThresholdReached
+            # and a copy the discarded request is generated
             max-queue-size = infinite
         }
     }
 }
 </code></pre>
 
-<h3>
+<h4>
+<a name="handling-failures" class="anchor" href="#handling-failures"><span class="octicon octicon-link"></span></a>Handling failures</h4>
+
+<p>The throttling client generates event when a requests handling has been unsuccessful. In any case spray-funnel will
+publish an event on the System <code>eventStream</code> with a copy of the failed request and a description of the failure
+The reason of failure and associated events are:</p>
+
+<ul>
+<li>The request failed because of a timeout: In this case an event of type <code>FailedClientRequest</code> with reason <code>Expired</code> is generated</li>
+<li>The request has been discarded according to the configuration of the channel throttler. The reasons can be two:
+
+<ul>
+<li>Max queue depth reached: In this case an event of type <code>DiscardedClientRequest</code> is generated with reason equal to <code>QueueThresholdReached</code>
+</li>
+<li>Request have been in the processing queue more than the configured <code>expiry</code> parameter. In this case an event of type <code>DiscardedClientRequest</code> is generated with reason equal to <code>Expired</code>
+</li>
+</ul>
+</li>
+</ul><h3>
 <a name="spray-server-1" class="anchor" href="#spray-server-1"><span class="octicon octicon-link"></span></a>Spray Server</h3>
 
 <p>At the moment the only supported pattern is using a singleton handler, since the wrapping funneling actor is only able to
@@ -235,7 +259,7 @@ using different funnels.</p>
 
 <p>then add the following dependencies to your sbt configuration</p>
 
-<pre><code>libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC2"
+<pre><code>libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3"
 </code></pre>
 
 <h2>
