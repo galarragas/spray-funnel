@@ -5,18 +5,23 @@ object Common {
 
   val settings: Seq[Setting[_]] = Seq (
     organization := "com.pragmasoft",
-    version := "1.0-RC4",
+    version := "1.0-RC3-spray1.3",
     scalaVersion := "2.10.3"
 //    ,crossScalaVersions := Seq("2.9.2")
   )
 
-  val akkaVersion = "2.2.3"
-
   val sl4jVersion = "1.7.5"
+
+  val isSpray1_3 = true
+
+  val sprayVersion = if(isSpray1_3) "1.3.1" else "1.2.0"
+  val akkaVersion = if(isSpray1_3) "2.3.2" else "2.2.3"
+
+  val sprayJsonVersion = "1.2.5"
 
 
   val runtimeDependencies = Seq(
-    "io.spray" % "spray-client" % "1.2.0",
+    "io.spray" % "spray-client" % sprayVersion,
     "io.spray" %% "spray-json" % "1.2.5",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
