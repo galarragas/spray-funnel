@@ -232,7 +232,7 @@ Test:
 Current version is not working propery with version 1.3 of spray (see issue #2).
 Version `1.0-RC3-spray1.3` has been built with the following dependencies
 
-- Scala 2.10
+- Scala 2.10/Scala 2.11
 - Spray 1.3.1
 - Akka 2.3.2
 
