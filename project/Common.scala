@@ -11,20 +11,8 @@ object Common {
   )
 
   val sl4jVersion = "1.7.5"
-
-  val isSpray1_3 = true
-
-  val sprayVersion = if(isSpray1_3) "1.3.1" else "1.2.0"
-  val akkaVersion = if(isSpray1_3) "2.3.2" else "2.2.3"
-
-
-  val runtimeDependencies = Seq(
-    "io.spray" % "spray-client" % sprayVersion,
-    "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-    "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-    "org.slf4j" % "slf4j-api" % sl4jVersion,
-    "org.slf4j" % "slf4j-jcl" % sl4jVersion
-  )
+  val sprayVersion = "1.3.1"
+  val akkaVersion = "2.3.2"
 
   val testDependencies = Seq(
     "org.specs2" %%  "specs2" % "2.3.12" % "test",
@@ -38,4 +26,19 @@ object Common {
     "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
     "Spray repo" at "http://repo.spray.io"
   )
+
+  def sprayImportVersion(scala_version: String) = scala_version match {
+    case "2.11.0" => "1.3.1-20140423"
+    case _ => sprayVersion
+  }
+
+  def runtimeDependencies(scala_version: String) =  Seq(
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+      "org.slf4j" % "slf4j-api" % sl4jVersion,
+      "org.slf4j" % "slf4j-jcl" % sl4jVersion,
+      "io.spray" %% "spray-client" % sprayImportVersion(scala_version)
+    )
+
+
 }
