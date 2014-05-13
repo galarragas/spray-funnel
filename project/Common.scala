@@ -32,12 +32,17 @@ object Common {
     case _ => sprayVersion
   }
 
+  def sprayClientImport(scala_version: String) = scala_version match {
+    case "2.11.0" => "io.spray" %% "spray-client" % sprayImportVersion(scala_version)
+    case _ => "io.spray" % "spray-client" % sprayImportVersion(scala_version)
+  }
+
   def runtimeDependencies(scala_version: String) =  Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
       "org.slf4j" % "slf4j-api" % sl4jVersion,
       "org.slf4j" % "slf4j-jcl" % sl4jVersion,
-      "io.spray" %% "spray-client" % sprayImportVersion(scala_version)
+      sprayClientImport(scala_version)
     )
 
 
