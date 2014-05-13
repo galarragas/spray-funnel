@@ -2,6 +2,9 @@ name := "spray-funnel"
 
 Common.settings
 
+net.virtualvoid.sbt.graph.Plugin.graphSettings
+
+
 libraryDependencies ++= Common.runtimeDependencies
 
 libraryDependencies ++= Common.testDependencies
