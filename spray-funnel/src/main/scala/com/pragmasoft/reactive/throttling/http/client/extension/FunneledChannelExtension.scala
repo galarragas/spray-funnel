@@ -1,6 +1,7 @@
 package com.pragmasoft.reactive.throttling.http.client.extension
 
-import akka.actor.{ExtensionKey, ActorRefFactory, ActorRef, ExtendedActorSystem}
+import akka.actor._
+import com.pragmasoft.reactive.throttling.http.{RequestThrottlingConfiguration, HttpThrottlingConfiguration}
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.ExecutionContext
 import akka.util.Timeout
@@ -35,16 +36,22 @@ trait FunneledChannelExtension extends akka.io.IO.Extension {
   val frequencyInterval : FiniteDuration = frequencyDuration.toMillis millis
   implicit val timeout : Timeout = timeoutDuration.toMillis millis
 
-  implicit val refFactory : ActorRefFactory = system
+  implicit val refFactory : ActorSystem = system
   import refFactory.dispatcher
 
   override def manager: ActorRef =
     system.actorOf(
-      if((maxParallelRequests >0 ) && (maxParallelRequests != Int.MaxValue))
-        propsForFrequencyAndParallelRequests( frequencyThreshold every frequencyInterval,  maxParallelRequests )
-      else
-        propsForFrequency( frequencyThreshold every frequencyInterval ),
-
+      propsForConfig(
+        HttpThrottlingConfiguration(
+          frequencyThreshold every frequencyInterval,
+          RequestThrottlingConfiguration(
+            if ((maxParallelRequests > 0) && (maxParallelRequests != Int.MaxValue)) maxParallelRequests else 0,
+            timeout,
+            requestExpiriy,
+            maxQueueSize
+          )
+        )
+      ),
       extensionName
     )
 }

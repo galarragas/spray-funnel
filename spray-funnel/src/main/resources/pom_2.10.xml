@@ -6,7 +6,7 @@
 
     <artifactId>spray-funnel_2.10</artifactId>
     <groupId>com.pragmasoft</groupId>
-    <version>1.0-RC3-spray1.3</version>
+    <version>1.0-RC4-spray1.3</version>
 
     <packaging>jar</packaging>
 
