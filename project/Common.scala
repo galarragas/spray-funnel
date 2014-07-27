@@ -6,8 +6,7 @@ object Common {
   val settings: Seq[Setting[_]] = Seq (
     organization := "com.pragmasoft",
     version := "1.0-RC4",
-    scalaVersion := "2.10.3",
-    crossScalaVersions := Seq("2.11.0")
+    scalaVersion := "2.10.3"
   )
 
   val akkaVersion = "2.2.3"
