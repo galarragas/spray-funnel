@@ -50,7 +50,7 @@ class DiscardedClientRequestNotGeneratedSpec extends Specification with NoTimeCo
     """
 akka {
       loglevel = DEBUG
-      loggers = ["akka.event.slf4j.Slf4jLogger"]
+      loggers = ["akka.testkit.TestEventListener"]
       log-dead-letters-during-shutdown=off
             log-config-on-start = off
             # event-stream = on
