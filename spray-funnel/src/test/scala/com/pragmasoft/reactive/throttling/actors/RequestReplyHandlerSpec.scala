@@ -1,20 +1,33 @@
 package com.pragmasoft.reactive.throttling.actors
 
+import akka.actor.{Props, ActorRef, ActorSystem}
 import akka.testkit.{TestProbe, ImplicitSender, TestKit}
-import akka.actor.{ActorRef, Props, ActorSystem}
-import scala.concurrent.duration._
-import org.specs2.mutable.Specification
-import org.specs2.time.NoTimeConversions
-import org.specs2.specification.Scope
-import spray.util.Utils
-import spray.http.HttpResponse
-import com.typesafe.config.ConfigFactory
 import com.pragmasoft.reactive.throttling.util.RetryExamples
+import com.typesafe.config.ConfigFactory
+import org.specs2.mutable.Specification
+import org.specs2.specification.Scope
+import org.specs2.time.NoTimeConversions
+import spray.util.Utils
+import scala.concurrent.duration._
 
-class PublishTimeoutFailureReplyHandler[Reply](coordinator: ActorRef)
-      (implicit replyManifest: Manifest[Reply]) extends RequestReplyHandler[Reply](coordinator)(replyManifest){
+case class Chunk(content: String) 
+case class LastChunk(content: String)
+
+class PublishTimeoutFailureReplyHandler(coordinator: ActorRef) extends RequestReplyHandler(coordinator) {
   override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit =
     context.system.eventStream.publish(clientRequest.request.asInstanceOf[AnyRef])
+
+  override def validateResponse(response: Any): ReplyHandlingStrategy = response match {
+    case accepted: String => COMPLETE
+    case Chunk(_) => WAIT_FOR_MORE
+    case fail => FAIL("Accepting just strings or chunks")
+  }
+
+  override def validateFurtherResponse(response: Any): ReplyHandlingStrategy = response match {
+    case Chunk(_) => WAIT_FOR_MORE
+    case LastChunk(_) => COMPLETE
+    case _ => FAIL("Accepting just chunks or last-chunks")
+  }
 }
 
 class RequestReplyHandlerSpec extends Specification with NoTimeConversions with RetryExamples {
@@ -32,58 +45,54 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
   val system = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
 
   abstract class ActorTestScope(actorSystem: ActorSystem) extends TestKit(actorSystem) with ImplicitSender with Scope {
-    def createHandler[Reply](coordinator: ActorRef)(implicit replyManifest: Manifest[Reply]): ActorRef =
-      actorSystem.actorOf(Props(classOf[PublishTimeoutFailureReplyHandler[Reply]], coordinator, replyManifest))
+    def createHandler(coordinator: ActorRef): ActorRef =
+      actorSystem.actorOf(Props(new PublishTimeoutFailureReplyHandler(coordinator)))
   }
-  
+
   "RequestReplyHandler" should {
     "forward request to transport" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
+      val handler = createHandler(coordinator.ref)
 
       handler ! ClientRequest("request", testActor, transport.ref, 1 second)
 
-      transport.expectMsgType[String] must be equalTo "request"
+      transport expectMsg "request"
     }
 
     "forward reply to client" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
+      val handler = createHandler(coordinator.ref)
 
       handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
 
-      transport.expectMsg("request")
-      transport.reply("Reply")
+      transport expectMsg "request"
+      transport reply "Reply"
 
-      client.expectMsgType[String] must be equalTo "Reply"
+      client expectMsg "Reply"
     }
 
-    "ignore replies of wrong type" in new ActorTestScope(system) {
+    "drop replies of type Int" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
-
-      val handlerDeathWatch = TestProbe()
-
-      handlerDeathWatch watch handler
+      val handler = createHandler(coordinator.ref)
 
       handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
 
-      transport.expectMsg("request")
-      transport.reply(handler, 100)
+      transport expectMsg "request"
+      transport reply 100
 
       client.expectNoMsg()
     }
 
-    "not fail for replies of wrong type" in new ActorTestScope(system) {
+    "not fail for replies of type Int" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
+      val handler = createHandler(coordinator.ref)
 
       val handlerDeathWatch = TestProbe()
 
@@ -91,18 +100,18 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
 
       handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
 
-      transport.expectMsg("request")
-      transport.reply(handler, 100)
+      transport expectMsg "request"
+      transport reply 100
 
       client.expectNoMsg()
       handlerDeathWatch.expectNoMsg()
     }
 
-    "notify it is ready after receiving whatever response" in new ActorTestScope(system) {
+    "notify it is ready after receiving full response" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
+      val handler = createHandler(coordinator.ref)
 
       handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
 
@@ -110,22 +119,22 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
 
       transport.send(handler, "Reply")
 
-      coordinator.expectMsgType[Ready.type] should not be null
+      coordinator expectMsg Ready
     }
 
     "wait the response for the timeout specified in the ClientRequest" in new ActorTestScope(system) {
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
-      val handler = createHandler[String](coordinator.ref)
+      val handler = createHandler(coordinator.ref)
 
       handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
 
       // letting the timeout expiry
       Thread.sleep(1100)
 
-      transport.expectMsg("request")
-      transport.reply(handler, "should be ignored")
+      transport expectMsg "request"
+      transport reply "should be ignored"
 
       client.expectNoMsg()
     }
@@ -142,22 +151,67 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
           val transport = TestProbe()
           val coordinator = TestProbe()
           val client = TestProbe()
-          val handler = createHandler[String](coordinator.ref)
+          val handler = createHandler(coordinator.ref)
 
           handler ! ClientRequest("request", client.ref, transport.ref, 1 second)
 
           // letting the timeout expiry
           Thread.sleep(1100)
 
-          eventListener.expectMsgType[String] must be equalTo "request"
+          eventListener expectMsg "request"
         }
       } finally {
         systemWithNoEvents.shutdown()
       }
     }
+
+    "propagate response and wait for more if chunk type response" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler(coordinator.ref)
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
+
+      transport expectMsg "request"
+      transport reply Chunk("chunk")
+
+      client expectMsg Chunk("chunk")
+
+      coordinator.expectNoMsg()
+    }
+
+    "propagate chunks and notify termination when closing message arrives" in new ActorTestScope(system) {
+      val transport = TestProbe()
+      val coordinator = TestProbe()
+      val client = TestProbe()
+      val handler = createHandler(coordinator.ref)
+
+      handler ! ClientRequest("request", client.ref, transport.ref, 2 second)
+      transport expectMsg "request"
+
+      transport reply Chunk("chunk")
+      client expectMsg Chunk("chunk")
+      coordinator.expectNoMsg(1 second)
+
+      transport.send(handler, Chunk("chunk"))
+      client expectMsg Chunk("chunk")
+      coordinator.expectNoMsg(1 second)
+
+      transport.send(handler, Chunk("chunk"))
+      client expectMsg Chunk("chunk")
+      coordinator.expectNoMsg(1 second)
+
+      transport.send(handler, LastChunk("last chunk"))
+      client expectMsg LastChunk("last chunk")
+      coordinator expectMsg Ready
+    }
+    
+
   }
 
   step {
     system.shutdown()
   }
+
 }
