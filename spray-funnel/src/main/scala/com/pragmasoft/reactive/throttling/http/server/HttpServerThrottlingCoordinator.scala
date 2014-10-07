@@ -32,7 +32,7 @@ object HttpServerRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpServerRequestReplyHandler], coordinator)
 }
 
-class HttpServerRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
+class HttpServerRequestReplyHandler(coordinator: ActorRef) extends SimpleRequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
     override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit = {
       log.debug("Request {} timed out!!", clientRequest)
       clientRequest.client ! HttpResponse(StatusCodes.InternalServerError,

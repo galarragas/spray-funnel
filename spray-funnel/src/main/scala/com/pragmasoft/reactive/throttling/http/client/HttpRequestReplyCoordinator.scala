@@ -26,7 +26,7 @@ object HttpClientRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpClientRequestReplyHandler], coordinator)
 }
 
-class HttpClientRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
+class HttpClientRequestReplyHandler(coordinator: ActorRef) extends SimpleRequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
     override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit =
       context.system.eventStream.publish(FailedClientRequest(FailureReason.Timeout, clientRequest.request))
 }
