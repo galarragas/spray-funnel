@@ -52,7 +52,6 @@ spray.can {
       startServer(interface = interface, port = port) {
         path("hello") {
           get {
-//            path()
             complete {
               <h1>Say hello to spray</h1>
             }
