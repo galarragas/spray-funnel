@@ -4,7 +4,7 @@ Common.settings
 
 libraryDependencies ++= Common.runtimeDependencies
 
-libraryDependencies ++= Common.testDependencies
+libraryDependencies <++= scalaVersion(Common.testDependencies(_))
 
 resolvers ++= Common.commonResolvers
 
