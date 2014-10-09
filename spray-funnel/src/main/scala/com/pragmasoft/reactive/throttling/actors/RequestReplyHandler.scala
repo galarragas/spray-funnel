@@ -9,7 +9,7 @@ import akka.util.Timeout
 import spray.http.{HttpRequest, StatusCodes, HttpResponse}
 import scala.reflect.ManifestFactory
 
-protected sealed trait ReplyHandlingStrategy
+sealed trait ReplyHandlingStrategy
 case class FAIL(message: String) extends ReplyHandlingStrategy
 case object WAIT_FOR_MORE extends ReplyHandlingStrategy
 case object COMPLETE extends ReplyHandlingStrategy

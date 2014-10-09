@@ -3,7 +3,7 @@ package com.pragmasoft.reactive.throttling.http.client
 import akka.actor.{ActorSystem, ActorRefFactory, Props, ActorRef}
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import com.pragmasoft.reactive.throttling.actors._
-import spray.http.HttpRequest
+import spray.http._
 import com.pragmasoft.reactive.throttling.actors.handlerspool.{OneActorPerRequestPool, FixedSizePool, HandlerFactory}
 import scala.concurrent.ExecutionContext
 import akka.util.Timeout
@@ -14,10 +14,8 @@ import scala.concurrent.duration._
 import scala.reflect.ManifestFactory
 import com.pragmasoft.reactive.throttling.http._
 import DiscardReason._
-import spray.http.HttpRequest
 import com.pragmasoft.reactive.throttling.actors.ClientRequest
 import com.pragmasoft.reactive.throttling.http.FailedClientRequest
-import spray.http.HttpResponse
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
 
@@ -26,9 +24,21 @@ object HttpClientRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpClientRequestReplyHandler], coordinator)
 }
 
-class HttpClientRequestReplyHandler(coordinator: ActorRef) extends SimpleRequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
+class HttpClientRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler(coordinator) {
     override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit =
       context.system.eventStream.publish(FailedClientRequest(FailureReason.Timeout, clientRequest.request))
+
+  override def validateResponse(response: Any): ReplyHandlingStrategy = response match {
+    case _: HttpResponse => COMPLETE
+    case ChunkedResponseStart(_) => WAIT_FOR_MORE
+    case _ => FAIL("Accepting only HttpResponse or Start notification for ChunkedResponse")
+  }
+
+  override def validateFurtherResponse(response: Any): ReplyHandlingStrategy = response match {
+    case _: MessageChunk => WAIT_FOR_MORE
+    case _: ChunkedMessageEnd => COMPLETE
+    case _ => FAIL("Accepting only message chunks or end of chunk list notification")
+  }
 }
 
 

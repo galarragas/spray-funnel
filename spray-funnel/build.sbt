@@ -8,7 +8,7 @@ net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 libraryDependencies <++= scalaVersion(Common.runtimeDependencies(_))
 
-libraryDependencies ++= Common.testDependencies
+libraryDependencies <++= scalaVersion(Common.testDependencies(_))
 
 resolvers ++= Common.commonResolvers
 
