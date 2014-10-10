@@ -16,7 +16,7 @@ import scala.concurrent.duration.{Duration, _}
 import spray.routing.Directives
 import spray.routing.Route
 
-class Issue7_ChunkedRequestNotSupported extends Specification with NoTimeConversions with Directives { //with RetryExamples {
+class Issue7ChunkedRequestNotSupported extends Specification with NoTimeConversions with Directives { //with RetryExamples {
   implicit val testConf = ConfigFactory.parseString(
     """
 akka {

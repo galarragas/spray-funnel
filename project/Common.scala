@@ -6,16 +6,15 @@ object Common {
   val settings: Seq[Setting[_]] = Seq (
     organization := "com.pragmasoft",
     version := "1.0",
-    scalaVersion := "2.10.3",
- 
+    scalaVersion := "2.10.3"
   )
 
   val akkaVersion = "2.2.3"
-  val sprayVersion = "1.3.1"
+  val sprayVersion = "1.2.1"
   val sl4jVersion = "1.7.5"
 
   def testDependencies(scala_version: String) = Seq(
-    "org.specs2" %%  "specs2" % "2.2.3" % "test",
+    "org.specs2" %%  "specs2" % "2.3.12" % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "org.mockito" % "mockito-all" % "1.9.5" % "test",
 
@@ -24,7 +23,7 @@ object Common {
     "org.slf4j" % "slf4j-jcl" % sl4jVersion % "test",
     "org.slf4j" % "slf4j-log4j12" % "1.7.5" % "test",
 
-    "io.spray" %% "spray-routing" % sprayImportVersion(scala_version) % "test"
+    "io.spray" % "spray-routing" % sprayImportVersion(scala_version) % "test"
   )
 
   val commonResolvers = Seq(
@@ -41,8 +40,8 @@ object Common {
 
   def runtimeDependencies(scala_version: String) =  Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-      "io.spray" %% "spray-client" % sprayImportVersion(scala_version)
-    )
+      "io.spray" % "spray-client" % sprayImportVersion(scala_version)
+  )
 
 
 }

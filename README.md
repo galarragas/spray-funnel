@@ -211,34 +211,31 @@ resolvers += "ConJars" at "http://conjars.org/repo",
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC4n"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0"
+```
+
+This version is not working properly with version 1.3 of spray (see issue #2).
+
+Use version `1.0-spray1.3` if you are working with Spray 1.3
+
+```
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-spray1.3"
 ```
 
 ## Dependencies:
 
-Runtime:
+Version `1.0` has been built with the following dependencies
 
 - Scala 2.10
-- Spray 1.2.0
+- Spray 1.2.1
 - Akka 2.2.3
 
-Test:
-
-- Akka_testkit 2.2.3
-- Specs2 2.2.3
-
-## Support of Spray 1.3
-
-Current version is not working propery with version 1.3 of spray (see issue #2).
-Version `1.0-RC3-spray1.3` has been built with the following dependencies
+Version `1.0-spray1.3` has been built with the following dependencies
 
 - Scala 2.10/Scala 2.11
 - Spray 1.3.1
 - Akka 2.3.2
 
-```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC4-spray1.3"
-```
 
 
 ## License

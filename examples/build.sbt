@@ -2,7 +2,7 @@ name := "spray-funnel-examples"
 
 Common.settings
 
-libraryDependencies ++= Common.runtimeDependencies
+libraryDependencies <++= scalaVersion(Common.runtimeDependencies(_))
 
 //val sprayVersion = "2.4-SNAPSHOT"
 

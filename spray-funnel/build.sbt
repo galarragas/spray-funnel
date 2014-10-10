@@ -1,8 +1,12 @@
+import sbt.Keys._
+
 name := "spray-funnel"
 
 Common.settings
 
-libraryDependencies ++= Common.runtimeDependencies
+net.virtualvoid.sbt.graph.Plugin.graphSettings
+
+libraryDependencies <++= scalaVersion(Common.runtimeDependencies(_))
 
 libraryDependencies <++= scalaVersion(Common.testDependencies(_))
 

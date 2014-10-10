@@ -81,7 +81,6 @@ qos.channels {
 }    """)
 
   implicit val system = ActorSystem("tsys", testConf)
-  import system.dispatcher // execution context for futures below
   val interface = "http://localhost"
   val port = 50000
 
@@ -90,7 +89,6 @@ qos.channels {
   sequential
 
   step {
-    import system.dispatcher
     /* this is to simulate a pretty slow service */
     val testService = system.actorOf(Props(new Actor with ActorLogging {
       val serviceLag = 1.seconds
