@@ -1,31 +1,25 @@
 package com.pragmasoft.reactive.throttling.http.server
 
 import org.specs2.mutable.{Around, Specification}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, Config}
 import akka.actor.{ActorRef, ActorSystem}
-import spray.util.Utils
 import akka.testkit.{TestProbe, ImplicitSender, TestKit}
 import org.specs2.specification.Scope
 import com.pragmasoft.reactive.throttling.threshold.Frequency
 import scala.concurrent.duration.{FiniteDuration, Duration}
 import org.specs2.time.NoTimeConversions
-import org.specs2.execute.{Result, AsResult}
-import spray.client.pipelining._
 import com.pragmasoft.reactive.throttling.http.server.HttpServerThrottling._
 import scala.concurrent.{ExecutionContext, Await, Future}
-import spray.http.{StatusCodes, HttpResponse}
 import scala.concurrent.duration._
 import com.pragmasoft.reactive.throttling.threshold._
 import akka.util.Timeout
 import com.pragmasoft.reactive.throttling.http.{RequestThrottlingConfiguration, HttpThrottlingConfiguration}
 import scala.util.Try
-import ExecutionContext.Implicits.global
-import spray.client.UnsuccessfulResponseException
 import com.pragmasoft.reactive.throttling.util._
 
 class SimpleSprayServerSpec extends Specification with NoTimeConversions with RetryExamples {
 
-  val testConf = ConfigFactory.parseString(
+  implicit val testConf = ConfigFactory.parseString(
     """
     akka {
       loglevel = INFO
@@ -223,41 +217,4 @@ class SimpleSprayServerSpec extends Specification with NoTimeConversions with Re
       }
     }
   }
-
-  import com.pragmasoft.reactive.throttling.util.stubserver._
-
-  class WithStubbedApi(throttlingWrappingFactory: (ActorRef, ActorSystem)  => ActorRef, serverResponseDelay: FiniteDuration = 0 millis) extends Around with StubServerSupport {
-    override lazy val context = ActorSystem(Utils.actorSystemNameFrom(getClass), testConf)
-
-
-    def callService(id: Int) : Future[String] = {
-      val pipeline = sendReceive(context, context.dispatcher) ~> {
-        responseFuture: Future[HttpResponse] =>  responseFuture flatMap {
-          response: HttpResponse =>
-            if(response.status == StatusCodes.OK) Future.successful(response.entity.asString)
-            else Future.failed(new UnsuccessfulResponseException(response.status))
-        }
-      }
-
-      pipeline { Get(s"http://$interface:$port$servicePath?id=$id") }
-    }
-
-
-    def around[T: AsResult](t: => T): Result = {
-
-      val (interface, port) = Utils.temporaryServerHostnameAndPort()
-
-      setupForServerTesting(interface, port, serverResponseDelay, throttlingWrappingFactory)
-      try {
-        AsResult(t)
-      } finally {
-        shutdown()
-
-        context.shutdown()
-      }
-    }
-
-  }
-
-
 }

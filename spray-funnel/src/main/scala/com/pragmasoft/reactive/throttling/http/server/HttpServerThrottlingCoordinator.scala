@@ -32,12 +32,26 @@ object HttpServerRequestReplyHandler {
   def props(coordinator: ActorRef) = Props(classOf[HttpServerRequestReplyHandler], coordinator)
 }
 
-class HttpServerRequestReplyHandler(coordinator: ActorRef) extends SimpleRequestReplyHandler[HttpResponse](coordinator)(ManifestFactory.classType(classOf[HttpResponse])) {
+class HttpServerRequestReplyHandler(coordinator: ActorRef) extends RequestReplyHandler(coordinator) {
     override def requestTimedOut(clientRequest: ClientRequest[Any]): Unit = {
       log.debug("Request {} timed out!!", clientRequest)
       clientRequest.client ! HttpResponse(StatusCodes.InternalServerError,
         "The server was not able to produce a timely response to your request.")
     }
+
+  override def validateResponse(response: Any): ReplyHandlingStrategy = response match {
+    case _: HttpResponse => COMPLETE
+    case Confirmed(ChunkedResponseStart(_), _) => WAIT_FOR_MORE
+    case _ => FAIL("Accepting only HttpResponse or Start notification for ChunkedResponse")
+  }
+
+  override def validateFurtherResponse(response: Any): ReplyHandlingStrategy = response match {
+    case Confirmed(ChunkedMessageEnd(_, _), _) => COMPLETE
+    // The ChunkingActor is waiting for a SentOk ack and the class is private, I'm going to accept anything when chunking
+//    case SentOk(_) => WAIT_FOR_MORE
+    case Confirmed(MessageChunk(_, _), _)  => WAIT_FOR_MORE
+    case _ => WAIT_FOR_MORE
+  }
 }
 
 

@@ -1,6 +1,7 @@
 package com.pragmasoft.reactive.throttling.actors
 
 import akka.actor.{ReceiveTimeout, Actor, ActorLogging, ActorRef}
+import scala.concurrent.duration.Duration.Undefined
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Await, Future}
 import akka.pattern.ask
@@ -26,7 +27,6 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
 
   import context.dispatcher
 
-
   override def receive: Actor.Receive = idle
 
   def idle: Actor.Receive = {
@@ -34,52 +34,64 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
 
       implicit val callTimeout: Timeout = requestTimeout
 
-      log.debug("Forwarding request {} to transport", request)
+      context setReceiveTimeout requestTimeout
 
-      val responseFuture: Future[Any] = transport ? request
+      log.debug("Forwarding request {} to transport {}", request, transport)
+      transport ! request
 
-      try {
-        val response = Await.result(responseFuture, requestTimeout)
+      context become waitingForTransportResponse(clientReq)
+  }
 
-        validateResponse(response) match {
-          case FAIL(message) =>
-            failResponse(response, message)
+  def waitingForTransportResponse(clientReq: ClientRequest[Any]): Actor.Receive = {
+    case ReceiveTimeout =>
+      timedOut(clientReq, s"Timeout exception while waiting for response to request ${clientReq.request}.")
 
-          case COMPLETE =>
-            client ! response
-            log.debug("Ready")
-            coordinator ! Ready
+    case response =>
+      // Most of the time should be the transport itself but it might have delegated another actor for this session
+      val transportRepresentativeActor = sender
 
-          case WAIT_FOR_MORE =>
-            client ! response
-            log.debug("Received response {}, waiting for more content", response)
-            context become waitingForMoreReplies(client, clientReq)
-        }
-      } catch {
-        case timeout: TimeoutException =>
-          timedOut(clientReq, s"Timeout exception while serving request $request. Exception: $timeout")
+      log.debug("Got response {} from {}", response, transportRepresentativeActor)
+
+      validateResponse(response) match {
+        case FAIL(message) =>
+          failResponse(response, message)
+
+        case COMPLETE =>
+          clientReq.client ! response
+          log.debug("Ready")
+          coordinator ! Ready
+          backToIdle()
+
+        case WAIT_FOR_MORE =>
+          clientReq.client ! response
+          log.debug("Received response {}, waiting for more content", response)
+          context become waitingForMoreReplies(transportRepresentativeActor, clientReq)
       }
   }
 
-  def waitingForMoreReplies(client: ActorRef, originClientRequest: ClientRequest[Any]): Actor.Receive = {
+  def waitingForMoreReplies(transportRepresentativeActor: ActorRef, originClientRequest: ClientRequest[Any]): Actor.Receive = {
     case ReceiveTimeout =>
       timedOut(originClientRequest, s"Timeout exception while waiting for more multi-part responses to request ${originClientRequest.request}.")
 
     case response =>
+      val forwardTo = if(sender == transportRepresentativeActor) originClientRequest.client else transportRepresentativeActor
+
+      log.debug("Got reply {} from {}", response, sender)
+
       validateFurtherResponse(response) match {
         case FAIL(message) =>
           failResponse(response, message)
 
         case COMPLETE =>
-          client ! response
-          log.debug("Last response of mulit-part response received. Notifying I'm Ready to coordinator")
+          originClientRequest.client ! response
+          log.debug("Last reply of mulit-part response received. Notifying I'm Ready to coordinator")
           coordinator ! Ready
-
-          context become idle
+          backToIdle()
 
         case WAIT_FOR_MORE =>
-          client ! response
-          log.debug("Received response {}, waiting for further content", response)
+          log.debug("Received reply {} and forwarding it to {}, waiting for further content", response, forwardTo)
+          forwardTo ! response
+
       }
   }
 
@@ -94,7 +106,14 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
     log.debug("Timed out, returning control to coordinator")
 
     coordinator ! Ready
+    backToIdle()
   }
+
+  def backToIdle() : Unit = {
+    context setReceiveTimeout Undefined
+    context become idle
+  }
+
 
   def requestTimedOut(clientRequest: ClientRequest[Any]): Unit
 
