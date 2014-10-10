@@ -178,7 +178,8 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
 
       client expectMsg Chunk("chunk")
 
-      coordinator.expectNoMsg()
+      // Not expecting any message before the timeout occurs
+      coordinator.expectNoMsg(1 second)
     }
 
     "propagate chunks and notify termination when closing message arrives" in new ActorTestScope(system) {
