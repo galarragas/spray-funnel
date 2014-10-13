@@ -89,7 +89,7 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
           backToIdle()
 
         case WAIT_FOR_MORE =>
-          log.info("Received reply {} and forwarding it to {}, waiting for further content", response, forwardTo)
+          log.debug("Received reply {} and forwarding it to {}, waiting for further content", response, forwardTo)
           forwardTo ! response
 
       }
