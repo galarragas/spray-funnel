@@ -84,12 +84,12 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
 
         case COMPLETE =>
           originClientRequest.client ! response
-          log.debug("Last reply of mulit-part response received. Notifying I'm Ready to coordinator")
+          log.info("Last reply of mulit-part response received. Notifying I'm Ready to coordinator")
           coordinator ! Ready
           backToIdle()
 
         case WAIT_FOR_MORE =>
-          log.debug("Received reply {} and forwarding it to {}, waiting for further content", response, forwardTo)
+          log.info("Received reply {} and forwarding it to {}, waiting for further content", response, forwardTo)
           forwardTo ! response
 
       }

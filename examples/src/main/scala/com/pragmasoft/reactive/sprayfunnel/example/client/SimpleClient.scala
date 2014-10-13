@@ -2,7 +2,6 @@ package com.pragmasoft.reactive.sprayfunnel.example.client
 
 import scala.concurrent.Future
 import spray.http._
-import spray.json.JsValue
 import spray.client.pipelining._
 import com.pragmasoft.reactive.throttling.threshold.Frequency._
 import com.pragmasoft.reactive.throttling.http.client.HttpClientThrottling
