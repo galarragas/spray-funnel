@@ -8,14 +8,23 @@ import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.Specification
 import org.specs2.time.NoTimeConversions
 import com.pragmasoft.reactive.throttling.threshold._
-import spray.routing.Directives
+import spray.http.{HttpData, MediaTypes, ContentType}
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.concurrent.Future._
+import scala.concurrent.Future
+import scala.concurrent.Await._
+import java.io.{FileInputStream, FileOutputStream, File, DataInputStream}
+import org.specs2.matcher.MatchResult
+import org.specs2.execute.Result
+
 import spray.routing.Route
 
 class Issue7ChunkedRequestNotSupported extends Specification with NoTimeConversions with RetryExamples {
   implicit val testConf = ConfigFactory.parseString(
     """
 akka {
-      loglevel = INFO
+      loglevel = WARNING
       loggers = ["akka.testkit.TestEventListener"]
       log-dead-letters-during-shutdown=off
             log-config-on-start = off
@@ -34,6 +43,7 @@ spray.can {
 }
     """)
 
+  import spray.routing.Directives._
 
   def chunkedRoute(system : ActorSystem): Route = {
     implicit val _ = system
@@ -83,42 +93,77 @@ spray.can {
       0.millis,
       Some(chunkedRoute)
     ) {
-      val resourceContentStream = result(callRoute("largeChunkedFile", getResponseAsStream).mapTo[Stream[HttpData]], 3.minutes)
-
-      val acquiredFile = File.createTempFile("downloadChunk", ".jpg")
-      acquiredFile.deleteOnExit()
-
-      val acquiredFileWriter = new FileOutputStream(acquiredFile)
-
-      resourceContentStream foreach { currChunk =>
-        acquiredFileWriter.write(currChunk.toByteArray)
-      }
-
-      acquiredFileWriter.close()
-
-      val file = new File( getClass.getClassLoader.getResource("Pizigani_1367_Chart_10MB.jpg").getFile )
-      val originFileStream = new DataInputStream(new FileInputStream(file))
-      val acquiredFileStream = new DataInputStream( new FileInputStream(acquiredFile) )
-
-      val originFileBuf = new Array[Byte](1000)
-      val acquiredFileBuf = new Array[Byte](1000)
-
-
-      try {
-        var finished = false
-        do {
-          val origLen = originFileStream.read(originFileBuf)
-          val acquiredLen = acquiredFileStream.read(acquiredFileBuf)
-
-          originFileBuf.take(origLen) shouldEqual acquiredFileBuf.take(acquiredLen)
-
-          finished = (origLen <= 0)
-        } while(!finished)
-      } finally {
-        originFileStream.close()
-        acquiredFileStream.close()
-      }
+      acquireAndCompareResource(
+        result(callRoute("largeChunkedFile", getResponseAsStream).mapTo[Stream[HttpData]], 3.minutes),
+        "Pizigani_1367_Chart_10MB.jpg"
+      )
     }
+
+    "handle chunked resources served by server - many parallel requests" in new WithStubbedApi(
+      (actor, context) => throttleFrequency(2 every 1.second)(actor)(context),
+      0.millis,
+      Some(chunkedRoute)
+    ) {
+      val testFutures = (1 to 15) map { idx =>
+        val (resourceName, fileName) =
+          if( (idx % 3) != 0)
+            ("chunkedFile", "funnel.jpg")
+          else
+            ("largeChunkedFile", "Pizigani_1367_Chart_10MB.jpg")
+
+        Future(
+          acquireAndCompareResource(
+            result(callRoute(resourceName, getResponseAsStream).mapTo[Stream[HttpData]], 3.minutes),
+            fileName
+          )
+        )
+      }
+
+      val testResults = Await.result( sequence(testFutures), 30.seconds )
+
+      testResults.fold(success) { (currResult, currElem) => currResult and currElem  }
+    }
+  }
+
+  def acquireAndCompareResource(acquireData: => Stream[HttpData], compareToResourceName: String): Result = {
+    val resourceContentStream = acquireData
+
+    val acquiredFile = File.createTempFile("downloadChunk", ".jpg")
+    acquiredFile.deleteOnExit()
+
+    val acquiredFileWriter = new FileOutputStream(acquiredFile)
+
+    resourceContentStream foreach { currChunk =>
+      acquiredFileWriter.write(currChunk.toByteArray)
+    }
+
+    acquiredFileWriter.close()
+
+    val file = new File( getClass.getClassLoader.getResource(compareToResourceName).getFile )
+    val originFileStream = new DataInputStream(new FileInputStream(file))
+    val acquiredFileStream = new DataInputStream( new FileInputStream(acquiredFile) )
+
+    val originFileBuf = new Array[Byte](1000)
+    val acquiredFileBuf = new Array[Byte](1000)
+
+    var matchResult: Result = success
+    try {
+      var finished = false
+
+      do {
+        val origLen = originFileStream.read(originFileBuf)
+        val acquiredLen = acquiredFileStream.read(acquiredFileBuf)
+
+        matchResult = (originFileBuf.take(origLen) shouldEqual acquiredFileBuf.take(acquiredLen))
+
+        finished = (origLen <= 0)
+      } while(!finished && matchResult.isSuccess)
+    } finally {
+      originFileStream.close()
+      acquiredFileStream.close()
+    }
+
+    matchResult
   }
 
 }
