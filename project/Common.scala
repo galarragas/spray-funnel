@@ -38,10 +38,17 @@ object Common {
     case _ => sprayVersion
   }
 
-  def runtimeDependencies(scala_version: String) =  Seq(
+  def runtimeDependencies(scala_version: String, provided: Boolean = false) = {
+    val deps = Seq(
       "com.typesafe.akka" %% "akka-actor" % akkaVersion,
       "io.spray" % "spray-client" % sprayImportVersion(scala_version)
   )
+
+    if(provided)
+      deps map { _ % "provided" }
+    else
+      deps
+  }
 
 
 }
