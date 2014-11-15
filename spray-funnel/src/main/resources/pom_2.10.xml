@@ -6,11 +6,7 @@
 
     <artifactId>spray-funnel_2.10</artifactId>
     <groupId>com.pragmasoft</groupId>
-<<<<<<< HEAD
-    <version>1.0</version>
-=======
-    <version>1.1-spray1.3</version>
->>>>>>> 09c0489... Fixing issue #8. Problems with the dependency declaration in the distribution pom.xml
+    <version>1.1</version>
 
     <packaging>jar</packaging>
 
