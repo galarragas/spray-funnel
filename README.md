@@ -211,7 +211,7 @@ resolvers += "ConJars" at "http://conjars.org/repo",
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-RC3"
 ```
 
 ## Dependencies:
@@ -237,7 +237,7 @@ Version `1.0-RC3-spray1.3` has been built with the following dependencies
 - Akka 2.3.2
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-RC3-spray1.3"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-RC3-spray1.3"
 ```
 
 ## License
