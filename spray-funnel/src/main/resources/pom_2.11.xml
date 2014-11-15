@@ -4,13 +4,9 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>spray-funnel_2.10</artifactId>
+    <artifactId>spray-funnel_2.11</artifactId>
     <groupId>com.pragmasoft</groupId>
-<<<<<<< HEAD
-    <version>1.0</version>
-=======
     <version>1.1-spray1.3</version>
->>>>>>> 09c0489... Fixing issue #8. Problems with the dependency declaration in the distribution pom.xml
 
     <packaging>jar</packaging>
 
@@ -56,36 +52,36 @@
 
 
     <dependencies>
-        <!-- Scala -->
+        <!-- Scala -->  
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
-            <version>2.10.3</version>
+            <version>2.11.0</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>io.spray</groupId>
-            <artifactId>spray-client_2.10</artifactId>
-            <version>1.2.0</version>
+            <artifactId>spray-client_2.11</artifactId>
+            <version>1.3.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.spray</groupId>
-            <artifactId>spray-json_2.10</artifactId>
-            <version>1.2.5</version>
+            <artifactId>spray-json_2.11</artifactId>
+            <version>1.2.6</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-actor_2.10</artifactId>
-            <version>2.2.3</version>
+            <artifactId>akka-actor_2.11</artifactId>
+            <version>2.3.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-slf4j_2.10</artifactId>
-            <version>2.2.3</version>
+            <artifactId>akka-slf4j_2.11</artifactId>
+            <version>2.3.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
