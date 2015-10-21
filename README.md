@@ -218,7 +218,7 @@ libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1"
 
 This version is not working properly with version 1.3 of spray (see issue #2).
 
-Use version `1.0-spray1.3` if you are working with Spray 1.3
+Use version `1.1-spray1.3` if you are working with Spray 1.3
 
 ```
 libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-spray1.3"
@@ -238,12 +238,6 @@ Version `1.0-spray1.3` has been built with the following dependencies
 - Spray 1.3.1
 - Akka 2.3.2
 
-<<<<<<< HEAD
-
-=======
-```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-RC3-spray1.3"
-```
 
 ## License
 
