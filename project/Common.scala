@@ -41,8 +41,8 @@ object Common {
 
   def runtimeDependencies(scala_version: String, provided: Boolean = false) = {
     val deps = Seq(
-      "com.typesafe.akka" %% "akka-actor" % akkaVersion % "provided",
-      "io.spray" %% "spray-client" % sprayImportVersion(scala_version) % "provided"
+      "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+      "io.spray" %% "spray-client" % sprayImportVersion(scala_version)
     )
 
     if(provided)
