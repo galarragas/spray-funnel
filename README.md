@@ -221,18 +221,18 @@ This version is not working properly with version 1.3 of spray (see issue #2).
 Use version `1.1-spray1.3` if you are working with Spray 1.3
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.0-spray1.3"
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-spray1.3"
 ```
 
 ## Dependencies:
 
-Version `1.0` has been built with the following dependencies
+Version `1.1` has been built with the following dependencies
 
 - Scala 2.10
 - Spray 1.2.1
 - Akka 2.2.3
 
-Version `1.0-spray1.3` has been built with the following dependencies
+Version `1.1-spray1.3` has been built with the following dependencies
 
 - Scala 2.10/Scala 2.11
 - Spray 1.3.1
