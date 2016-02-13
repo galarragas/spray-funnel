@@ -202,10 +202,10 @@ using different funnels.
 
 ## Adding Dependency to Spray Funnel
 
-Add conjars repository to your resolvers:
+Add my Bintray repository to your resolvers:
 
 ```
-resolvers += "ConJars" at "http://conjars.org/repo",
+resolvers += Resolver.bintrayRepo("galarragas", "maven")
 ```
 
 then add the following dependencies to your sbt configuration
@@ -226,18 +226,31 @@ libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-spray1.3"
 
 ## Dependencies:
 
-Version `1.1` has been built with the following dependencies
+Runtime:
 
 - Scala 2.10
-- Spray 1.2.1
+- Spray Client 1.2.0
 - Akka 2.2.3
 
-Version `1.1-spray1.3` has been built with the following dependencies
+Test:
+
+- Akka_testkit 2.2.3
+- Specs2 2.2.3
+
+## Support of Spray 1.3
+
+Current version is not working propery with version 1.3 of spray (see issue #2).
+Version `1.0-RC3-spray1.3` has been built with the following dependencies
 
 - Scala 2.10/Scala 2.11
 - Spray 1.3.1
 - Akka 2.3.2
 
+To use it please add the following to your sbt file
+
+```
+libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1-spray1.3"
+```
 
 ## License
 
