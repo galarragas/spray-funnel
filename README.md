@@ -202,16 +202,16 @@ using different funnels.
 
 ## Adding Dependency to Spray Funnel
 
-Add conjars repository to your resolvers:
+Add my Bintray repository to your resolvers:
 
 ```
-resolvers += "ConJars" at "http://conjars.org/repo",
+resolvers += Resolver.bintrayRepo("galarragas", "maven")
 ```
 
 then add the following dependencies to your sbt configuration
 
 ```
-libraryDependencies += "com.pragmasoft" %% "spray-funnel" % "1.1"
+libraryDependencies +=  "com.pragmasoft" %% "spray-funnel" % "1.1"
 ```
 
 ## Dependencies:

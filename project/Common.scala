@@ -7,7 +7,8 @@ object Common {
     organization := "com.pragmasoft",
     version := "1.1-spray1.3",
     scalaVersion := "2.10.3",
-    crossScalaVersions := Seq("2.11.0")
+    crossScalaVersions := Seq("2.11.0"),
+    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
   )
 
   val sl4jVersion = "1.7.5"
