@@ -1,5 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors
 
+import akka.actor.Status.Failure
 import akka.testkit.{TestProbe, ImplicitSender, TestKit}
 import akka.actor.{ActorRef, Props, ActorSystem}
 import scala.concurrent.duration._
@@ -61,6 +62,7 @@ class SimpleRequestReplyHandlerSpec extends Specification with NoTimeConversions
     }
 
     "ignore replies of wrong type" in new ActorTestScope(system) {
+
       val transport = TestProbe()
       val coordinator = TestProbe()
       val client = TestProbe()
@@ -71,7 +73,7 @@ class SimpleRequestReplyHandlerSpec extends Specification with NoTimeConversions
       transport.expectMsg("request")
       transport.reply(handler, 100)
 
-      client.expectNoMsg()
+      client expectMsgClass classOf[Failure]
     }
 
     "not fail for replies of wrong type" in new ActorTestScope(system) {
@@ -89,7 +91,7 @@ class SimpleRequestReplyHandlerSpec extends Specification with NoTimeConversions
       transport.expectMsg("request")
       transport.reply(handler, 100)
 
-      client.expectNoMsg()
+      client expectMsgClass classOf[Failure]
       handlerDeathWatch.expectNoMsg()
     }
 

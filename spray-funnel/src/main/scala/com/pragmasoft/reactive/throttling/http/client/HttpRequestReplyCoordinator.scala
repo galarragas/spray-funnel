@@ -1,23 +1,19 @@
 package com.pragmasoft.reactive.throttling.http.client
 
-import akka.actor.{ActorSystem, ActorRefFactory, Props, ActorRef}
-import com.pragmasoft.reactive.throttling.threshold.Frequency
-import com.pragmasoft.reactive.throttling.actors._
-import spray.http._
-import com.pragmasoft.reactive.throttling.actors.handlerspool.{OneActorPerRequestPool, FixedSizePool, HandlerFactory}
-import scala.concurrent.ExecutionContext
-import akka.util.Timeout
+import akka.actor._
 import akka.io
-import spray.can.Http
-import spray.util._
-import scala.concurrent.duration._
-import scala.reflect.ManifestFactory
-import com.pragmasoft.reactive.throttling.http._
-import DiscardReason._
-import com.pragmasoft.reactive.throttling.actors.ClientRequest
-import com.pragmasoft.reactive.throttling.http.FailedClientRequest
+import akka.util.Timeout
+import com.pragmasoft.reactive.throttling.actors.{ClientRequest, _}
+import com.pragmasoft.reactive.throttling.actors.handlerspool.{FixedSizePool, HandlerFactory, OneActorPerRequestPool}
+import com.pragmasoft.reactive.throttling.http.DiscardReason._
+import com.pragmasoft.reactive.throttling.http.{DiscardedClientRequest, FailedClientRequest, _}
 import com.pragmasoft.reactive.throttling.threshold.Frequency
-import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
+import spray.can.Http
+import spray.http._
+import spray.util._
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 
 object HttpClientRequestReplyHandler {
@@ -31,13 +27,15 @@ class HttpClientRequestReplyHandler(coordinator: ActorRef) extends RequestReplyH
   override def validateResponse(response: Any): ReplyHandlingStrategy = response match {
     case _: HttpResponse => COMPLETE
     case ChunkedResponseStart(_) => WAIT_FOR_MORE
-    case _ => FAIL("Accepting only HttpResponse or Start notification for ChunkedResponse")
+    case f: Status.Failure => FAIL(f)
+    case _ => FAIL("Something unknown happened")
   }
 
   override def validateFurtherResponse(response: Any): ReplyHandlingStrategy = response match {
     case _: MessageChunk => WAIT_FOR_MORE
     case _: ChunkedMessageEnd => COMPLETE
-    case _ => FAIL("Accepting only message chunks or end of chunk list notification")
+    case f: Status.Failure => FAIL(f)
+    case _ => FAIL("Something unknown happened")
   }
 }
 
