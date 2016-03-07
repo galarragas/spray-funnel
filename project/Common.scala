@@ -23,7 +23,7 @@ object Common {
     "org.slf4j" % "slf4j-api" % sl4jVersion % "test",
     "org.slf4j" % "slf4j-jcl" % sl4jVersion % "test",
     "org.slf4j" % "slf4j-log4j12" % "1.7.5" % "test",
-    "org.scalaz.stream" % "scalaz-stream_2.11" % "0.7.2a" % "test",
+    "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a" % "test",
 
 
     "io.spray" %% "spray-routing" % sprayImportVersion(scala_version) % "test"
