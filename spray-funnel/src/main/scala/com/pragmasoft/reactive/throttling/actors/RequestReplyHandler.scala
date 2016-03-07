@@ -1,6 +1,7 @@
 package com.pragmasoft.reactive.throttling.actors
 
-import akka.actor.{ReceiveTimeout, Actor, ActorLogging, ActorRef}
+import akka.actor._
+import akka.dispatch.sysmsg.Failed
 import scala.concurrent.duration.Duration.Undefined
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Await, Future}
@@ -11,7 +12,12 @@ import spray.http.{HttpRequest, StatusCodes, HttpResponse}
 import scala.reflect.ManifestFactory
 
 sealed trait ReplyHandlingStrategy
-case class FAIL(message: String) extends ReplyHandlingStrategy
+
+object FAIL {
+  def apply(s: String): ReplyHandlingStrategy = FAIL(Status.Failure(new IllegalStateException(s)))
+}
+
+case class FAIL(reason: Status.Failure) extends ReplyHandlingStrategy
 case object WAIT_FOR_MORE extends ReplyHandlingStrategy
 case object COMPLETE extends ReplyHandlingStrategy
 
@@ -53,8 +59,9 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
       log.debug("Got response {} from {}", response, transportRepresentativeActor)
 
       validateResponse(response) match {
-        case FAIL(message) =>
-          failResponse(response, message)
+        case FAIL(reason) =>
+          clientReq.client ! reason
+          failResponse(response, reason.cause.getMessage)
 
         case COMPLETE =>
           clientReq.client ! response
@@ -79,8 +86,9 @@ abstract class RequestReplyHandler(coordinator: ActorRef) extends Actor with Act
       log.debug("Got reply {} from {}", response, sender)
 
       validateFurtherResponse(response) match {
-        case FAIL(message) =>
-          failResponse(response, message)
+        case FAIL(reason) =>
+          originClientRequest.client ! reason
+          failResponse(response, reason.cause.getMessage)
 
         case COMPLETE =>
           originClientRequest.client ! response
@@ -128,7 +136,7 @@ abstract class SimpleRequestReplyHandler[Reply](coordinator: ActorRef)(implicit 
     if (replyManifest.runtimeClass.isAssignableFrom(response.getClass))
       COMPLETE
     else
-      FAIL(s"Accepting replies of type ${manifest.runtimeClass} ")
+      FAIL(s"Accepting replies of type ${manifest.runtimeClass}, but received ${response.getClass}")
   }
 
   override def validateFurtherResponse(response: Any) = validateResponse(response)

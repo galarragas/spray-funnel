@@ -5,7 +5,7 @@ object Common {
 
   val settings: Seq[Setting[_]] = Seq (
     organization := "com.pragmasoft",
-    version := "1.1",
+    version := "1.2",
     scalaVersion := "2.10.3",
     licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
   )
@@ -15,7 +15,7 @@ object Common {
   val akkaVersion = "2.3.2"
 
   def testDependencies(scala_version: String) = Seq(
-    "org.specs2" %%  "specs2" % "2.3.12" % "test",
+    "org.specs2" %%  "specs2" % "2.5" % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "org.mockito" % "mockito-all" % "1.9.5" % "test",
 
@@ -23,6 +23,8 @@ object Common {
     "org.slf4j" % "slf4j-api" % sl4jVersion % "test",
     "org.slf4j" % "slf4j-jcl" % sl4jVersion % "test",
     "org.slf4j" % "slf4j-log4j12" % "1.7.5" % "test",
+    "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a" % "test",
+
 
     "io.spray" %% "spray-routing" % sprayImportVersion(scala_version) % "test"
   )

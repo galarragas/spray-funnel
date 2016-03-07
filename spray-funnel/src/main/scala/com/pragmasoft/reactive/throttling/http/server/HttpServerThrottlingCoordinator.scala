@@ -1,31 +1,14 @@
 package com.pragmasoft.reactive.throttling.http.server
 
-import akka.actor.{ActorSystem, ActorRefFactory, Props, ActorRef}
-import com.pragmasoft.reactive.throttling.threshold.Frequency
-import com.pragmasoft.reactive.throttling.actors._
-import spray.http._
-import com.pragmasoft.reactive.throttling.actors.handlerspool.{OneActorPerRequestPool, FixedSizePool, HandlerFactory}
-import scala.concurrent.ExecutionContext
+import akka.actor._
 import akka.util.Timeout
-import akka.io
-import spray.can.Http
-import spray.util._
-import scala.concurrent.duration._
-import com.pragmasoft.reactive.throttling.threshold.Frequency
-import scala.reflect.ManifestFactory
-import com.pragmasoft.reactive.throttling.http._
-import DiscardReason._
-import com.pragmasoft.reactive.throttling.http.DiscardReason
-import com.pragmasoft.reactive.throttling.actors.ClientRequest
-import com.pragmasoft.reactive.throttling.http.FailedClientRequest
-import com.pragmasoft.reactive.throttling.threshold.Frequency
-import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
-import spray.http.HttpRequest
-import com.pragmasoft.reactive.throttling.actors.ClientRequest
-import spray.http.HttpResponse
-import com.pragmasoft.reactive.throttling.threshold.Frequency
-import com.pragmasoft.reactive.throttling.http.DiscardedClientRequest
+import com.pragmasoft.reactive.throttling.actors.{ClientRequest, _}
+import com.pragmasoft.reactive.throttling.actors.handlerspool.{FixedSizePool, HandlerFactory, OneActorPerRequestPool}
 import com.pragmasoft.reactive.throttling.http.HttpThrottlingConfiguration
+import com.pragmasoft.reactive.throttling.threshold.Frequency
+import spray.http.{HttpRequest, HttpResponse, _}
+
+import scala.concurrent.duration._
 
 
 object HttpServerRequestReplyHandler {
@@ -42,6 +25,7 @@ class HttpServerRequestReplyHandler(coordinator: ActorRef) extends RequestReplyH
   override def validateResponse(response: Any): ReplyHandlingStrategy = response match {
     case _: HttpResponse => COMPLETE
     case Confirmed(ChunkedResponseStart(_), _) => WAIT_FOR_MORE
+    case f: Status.Failure => FAIL(f)
     case _ => FAIL("Accepting only HttpResponse or Start notification for ChunkedResponse")
   }
 
