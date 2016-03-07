@@ -1,5 +1,6 @@
 package com.pragmasoft.reactive.throttling.actors
 
+import akka.actor.Status.Failure
 import akka.actor.{Props, ActorRef, ActorSystem}
 import akka.testkit.{TestProbe, ImplicitSender, TestKit}
 import com.pragmasoft.reactive.throttling.util.RetryExamples
@@ -85,7 +86,7 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
       transport expectMsg "request"
       transport reply 100
 
-      client.expectNoMsg()
+      client expectMsgClass classOf[Failure]
     }
 
     "not fail for replies of type Int" in new ActorTestScope(system) {
@@ -103,7 +104,7 @@ class RequestReplyHandlerSpec extends Specification with NoTimeConversions with 
       transport expectMsg "request"
       transport reply 100
 
-      client.expectNoMsg()
+      client expectMsgClass classOf[Failure]
       handlerDeathWatch.expectNoMsg()
     }
 
