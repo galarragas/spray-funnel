@@ -55,7 +55,7 @@ A very simple way of using this library is to specify the throttling setting in 
 ```scala
 class SimpleSprayClient(serverBaseAddress: String timeout: Timeout) {
   import SimpleClientProtocol._
-  import com.pragmasoft.reactive.throttling.http.HttpRequestThrottling._
+  import com.pragmasoft.reactive.throttling.http.client.HttpClientThrottling._
 
   implicit val actorSystem = ActorSystem("program-info-client", ConfigFactory.parseResources("test.conf"))
 
